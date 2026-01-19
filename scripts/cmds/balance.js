@@ -1,46 +1,52 @@
+const { getPrefix } = global.utils;
+
 module.exports = {
-	config: {
-		name: "balance",
-		aliases: ["bal"],
-		version: "1.2",
-		author: "NTKhang",
-		countDown: 5,
-		role: 0,
-		description: {
-			vi: "xem số tiền hiện có của bạn hoặc người được tag",
-			en: "view your money or the money of the tagged person"
-		},
-		category: "economy",
-		guide: {
-			vi: "   {pn}: xem số tiền của bạn"
-				+ "\n   {pn} <@tag>: xem số tiền của người được tag",
-			en: "   {pn}: view your money"
-				+ "\n   {pn} <@tag>: view the money of the tagged person"
-		}
-	},
+  config: {
+    name: "balance",
+    version: "1.0",
+    author: "RAFI",
+    countDown: 5,
+    role: 0,
+    shortDescription: {
+      en: "Check your economy balance"
+    },
+    longDescription: {
+      en: "Check your cash and bank balance"
+    },
+    category: "economy",
+    guide: {
+      en: "{pn} or {pn} [@user]"
+    }
+  },
 
-	langs: {
-		vi: {
-			money: "Bạn đang có %1$",
-			moneyOf: "%1 đang có %2$"
-		},
-		en: {
-			money: "You have %1$",
-			moneyOf: "%1 has %2$"
-		}
-	},
-
-	onStart: async function ({ message, usersData, event, getLang }) {
-		if (Object.keys(event.mentions).length > 0) {
-			const uids = Object.keys(event.mentions);
-			let msg = "";
-			for (const uid of uids) {
-				const userMoney = await usersData.get(uid, "money");
-				msg += getLang("moneyOf", event.mentions[uid].replace("@", ""), userMoney) + '\n';
-			}
-			return message.reply(msg);
-		}
-		const userData = await usersData.get(event.senderID);
-		message.reply(getLang("money", userData.money));
-	}
+  onStart: async function ({ message, event, args, usersData }) {
+    try {
+      const { senderID, threadID } = event;
+      const targetID = args[0] ? args[0].replace(/@/g, "") : senderID;
+      
+      // এখানে আপনার ডাটাবেস থেকে ব্যালেন্স লোড করুন
+      // উদাহরণ:
+      // const userData = await usersData.get(targetID);
+      // const cash = userData.money || 0;
+      // const bank = userData.bank || 0;
+      
+      // Temporary data (আপনার ডাটাবেস অনুযায়ী পরিবর্তন করুন)
+      const cash = 1000;
+      const bank = 500;
+      const total = cash + bank;
+      
+      const userName = await usersData.getName(targetID);
+      
+      const response = `💰 **${userName}'s Balance** 💰\n\n` +
+                      `💵 Cash: ${cash} $\n` +
+                      `🏦 Bank: ${bank} $\n` +
+                      `📊 Total: ${total} $\n\n` +
+                      `💡 Use: !deposit, !withdraw, !transfer`;
+      
+      await message.reply(response);
+    } catch (error) {
+      console.error(error);
+      await message.reply("❌ Error checking balance. Please try again.");
+    }
+  }
 };
