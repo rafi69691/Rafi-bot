@@ -1,37 +1,27 @@
+const economy = require('../economy');
+
 module.exports = {
   config: {
     name: "withdraw",
+    aliases: ["তোলা", "উইথড্র"],
     version: "1.0",
     author: "RAFI",
     countDown: 5,
     role: 0,
-    shortDescription: {
-      en: "Withdraw money from bank"
-    },
-    longDescription: {
-      en: "Withdraw money from your bank account to cash"
-    },
+    shortDescription: { en: "Withdraw money from bank" },
+    longDescription: { en: "Withdraw money from bank to cash" },
     category: "economy",
-    guide: {
-      en: "{pn} [amount]"
-    }
+    guide: { en: "{pn} [amount]" }
   },
-
   onStart: async function ({ message, event, args }) {
     const amount = parseInt(args[0]);
+    if (!amount) return message.reply("❌ Amount required! Example: !withdraw 1000");
     
-    if (!amount || isNaN(amount) || amount <= 0) {
-      return message.reply("❌ Please enter a valid amount to withdraw.\nExample: !withdraw 300");
-    }
+    const result = economy.removeMoney(event.senderID, amount, 'bank', 'Withdraw from bank');
+    if (!result.success) return message.reply(result.message);
     
-    // এখানে ডাটাবেস লজিক যোগ করুন
-    // Check if user has enough bank balance
-    // Withdraw to cash
+    economy.addMoney(event.senderID, amount, 'cash', 'Withdrew from bank');
     
-    const response = `✅ Successfully withdrawn ${amount} $ from your bank!\n` +
-                    `💵 Cash: +${amount} $\n` +
-                    `🏦 Bank: -${amount} $`;
-    
-    await message.reply(response);
+    await message.reply(`✅ Withdrew ${amount.toLocaleString()} টাকা from bank!\n💵 Cash: ${(result.cash + amount).toLocaleString()}\n🏦 Bank: ${result.bank.toLocaleString()}`);
   }
 };
