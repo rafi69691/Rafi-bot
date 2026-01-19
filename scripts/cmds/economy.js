@@ -1,33 +1,35 @@
-// economy.js
+// scripts/economy.js
 const fs = require('fs');
 const path = require('path');
 
 class EconomySystem {
     constructor() {
-        this.dataPath = path.join(__dirname, 'data/economy.json');
+        this.dataPath = path.join(__dirname, 'data/economy_data.json');
         this.loadData();
-        
-        // VIP প্রাইস
-        this.vipPlans = {
-            1: { name: "Bronze VIP", price: 10000000, dailyBonus: 100000 },
-            2: { name: "Silver VIP", price: 30000000, dailyBonus: 300000 },
-            3: { name: "Gold VIP", price: 69000000, dailyBonus: 690000 },
-            4: { name: "Diamond VIP", price: 109000000, dailyBonus: 1090000 },
-            5: { name: "Royal VIP", price: 1000000000, dailyBonus: 5000000 }
-        };
+        this.initializeDefaultData();
     }
 
     loadData() {
         try {
             if (fs.existsSync(this.dataPath)) {
-                this.data = JSON.parse(fs.readFileSync(this.dataPath, 'utf8'));
+                const rawData = fs.readFileSync(this.dataPath, 'utf8');
+                this.data = JSON.parse(rawData);
+                console.log('📁 Economy data loaded successfully');
             } else {
-                this.data = { users: {}, transactions: [] };
-                this.saveData();
+                this.data = {
+                    users: {},
+                    transactions: [],
+                    lastReset: Date.now()
+                };
+                console.log('📁 New economy data created');
             }
         } catch (error) {
-            console.error('Error loading economy data:', error);
-            this.data = { users: {}, transactions: [] };
+            console.error('❌ Error loading economy data:', error);
+            this.data = {
+                users: {},
+                transactions: [],
+                lastReset: Date.now()
+            };
         }
     }
 
@@ -39,8 +41,14 @@ class EconomySystem {
             }
             fs.writeFileSync(this.dataPath, JSON.stringify(this.data, null, 2));
         } catch (error) {
-            console.error('Error saving economy data:', error);
+            console.error('❌ Error saving economy data:', error);
         }
+    }
+
+    initializeDefaultData() {
+        if (!this.data.users) this.data.users = {};
+        if (!this.data.transactions) this.data.transactions = [];
+        if (!this.data.lastReset) this.data.lastReset = Date.now();
     }
 
     // ইউজার ডাটা পাওয়া
@@ -49,7 +57,7 @@ class EconomySystem {
             this.data.users[userId] = {
                 userId: userId,
                 username: username,
-                cash: 1000000, // Starting cash 1 million
+                cash: 1000000, // Starting: 1 Million
                 bank: 0,
                 total: 1000000,
                 isVip: false,
@@ -57,14 +65,15 @@ class EconomySystem {
                 vipExpires: null,
                 dailyClaimed: null,
                 vipDailyClaimed: null,
-                totalEarned: 0,
+                totalEarned: 1000000,
                 totalSpent: 0,
                 gambleWins: 0,
                 gambleLosses: 0,
                 dailyTasks: {},
                 lastWork: null,
                 level: 1,
-                xp: 0
+                xp: 0,
+                lastUpdated: Date.now()
             };
             this.saveData();
         } else if (username !== 'User' && this.data.users[userId].username !== username) {
@@ -72,18 +81,28 @@ class EconomySystem {
             this.saveData();
         }
         
+        // Calculate total
+        this.data.users[userId].total = this.data.users[userId].cash + this.data.users[userId].bank;
         return this.data.users[userId];
     }
 
-    // ব্যালেন্স চেক
+    // ✅ ব্যালেন্স চেক (সঠিকভাবে)
     checkBalance(userId) {
         const user = this.getUser(userId);
         user.total = user.cash + user.bank;
+        user.lastUpdated = Date.now();
         this.saveData();
-        return user;
+        return {
+            cash: user.cash,
+            bank: user.bank,
+            total: user.total,
+            vipLevel: user.vipLevel,
+            isVip: user.isVip,
+            username: user.username
+        };
     }
 
-    // টাকা যোগ
+    // ✅ টাকা যোগ
     addMoney(userId, amount, type = 'cash', reason = 'Added') {
         const user = this.getUser(userId);
         
@@ -95,14 +114,20 @@ class EconomySystem {
         
         user.total = user.cash + user.bank;
         user.totalEarned += amount;
+        user.lastUpdated = Date.now();
         
-        this.logTransaction(userId, 'add', amount, { reason });
+        this.logTransaction(userId, 'add', amount, { reason, type });
         this.saveData();
         
-        return user;
+        return {
+            success: true,
+            cash: user.cash,
+            bank: user.bank,
+            total: user.total
+        };
     }
 
-    // টাকা কমান
+    // ✅ টাকা কমান
     removeMoney(userId, amount, type = 'cash', reason = 'Removed') {
         const user = this.getUser(userId);
         
@@ -121,92 +146,85 @@ class EconomySystem {
         
         user.total = user.cash + user.bank;
         user.totalSpent += amount;
+        user.lastUpdated = Date.now();
         
-        this.logTransaction(userId, 'remove', amount, { reason });
-        this.saveData();
-        
-        return { success: true, user };
-    }
-
-    // ট্রান্সফার
-    transferMoney(senderId, receiverId, amount) {
-        const sender = this.getUser(senderId);
-        const receiver = this.getUser(receiverId);
-        
-        if (sender.bank < amount) {
-            return { success: false, message: 'Insufficient bank balance' };
-        }
-        
-        // VIP বোনাস চেক
-        let vipBonus = 0;
-        if (sender.vipLevel >= 1) {
-            vipBonus = Math.floor(amount * (sender.vipLevel * 0.01));
-        }
-        
-        const totalAmount = amount + vipBonus;
-        
-        sender.bank -= amount;
-        receiver.bank += totalAmount;
-        
-        sender.total = sender.cash + sender.bank;
-        receiver.total = receiver.cash + receiver.bank;
-        
-        sender.totalSpent += amount;
-        receiver.totalEarned += totalAmount;
-        
-        // ট্রানজেকশন লগ
-        this.logTransaction(senderId, 'transfer_sent', amount, { to: receiverId, vipBonus });
-        this.logTransaction(receiverId, 'transfer_received', totalAmount, { from: senderId, vipBonus });
-        
+        this.logTransaction(userId, 'remove', amount, { reason, type });
         this.saveData();
         
         return {
             success: true,
-            sender: sender,
-            receiver: receiver,
-            vipBonus: vipBonus,
-            totalAmount: totalAmount
+            cash: user.cash,
+            bank: user.bank,
+            total: user.total
         };
     }
 
-    // গ্যাম্বলিং
-    gamble(userId, amount, gameType) {
+    // ✅ গ্যাম্বলিং সিস্টেম (ঠিকভাবে কাজ করবে)
+    gamble(userId, amount, gameType = 'coinflip') {
         const user = this.getUser(userId);
         
+        // চেক যদি যথেষ্ট টাকা থাকে
         if (user.cash < amount) {
-            return { success: false, message: 'Insufficient cash' };
+            return { 
+                success: false, 
+                message: `❌ Insufficient cash! You have ${user.cash.toLocaleString()} টাকা` 
+            };
         }
+        
+        // গেম অনুযায়ী win chance
+        const gameConfig = {
+            coinflip: { winChance: 50, minMultiplier: 1.8, maxMultiplier: 2.2 },
+            dice: { winChance: 50, minMultiplier: 1.5, maxMultiplier: 6.0 },
+            slots: { winChance: 35, minMultiplier: 3.0, maxMultiplier: 10.0 },
+            roulette: { winChance: 48, minMultiplier: 2.0, maxMultiplier: 36.0 },
+            blackjack: { winChance: 42, minMultiplier: 1.5, maxMultiplier: 3.0 }
+        };
+        
+        const game = gameConfig[gameType] || gameConfig.coinflip;
         
         // VIP বোনাস
-        let winChance = 45;
-        if (user.vipLevel >= 1) {
-            winChance += (user.vipLevel * 5);
+        let winChance = game.winChance;
+        if (user.isVip && user.vipLevel > 0) {
+            winChance += (user.vipLevel * 5); // +5% per VIP level
         }
         
-        const isWin = Math.random() * 100 <= winChance;
+        // জেতার লজিক
+        const random = Math.random() * 100;
+        const isWin = random <= winChance;
         
         if (isWin) {
-            const multiplier = 1.5 + Math.random() * 2.5; // 1.5x - 4x
+            // জিতলে
+            const multiplier = game.minMultiplier + Math.random() * (game.maxMultiplier - game.minMultiplier);
             const winAmount = Math.floor(amount * multiplier);
             
             user.cash += winAmount;
             user.totalEarned += winAmount;
             user.gambleWins += 1;
+            user.lastUpdated = Date.now();
             
-            this.logTransaction(userId, 'gamble_win', winAmount, { game: gameType, bet: amount });
+            this.logTransaction(userId, 'gamble_win', winAmount, { 
+                game: gameType, 
+                bet: amount, 
+                multiplier: multiplier.toFixed(2) 
+            });
             this.saveData();
             
             return {
                 success: true,
                 win: true,
                 amount: winAmount,
-                multiplier: multiplier,
-                user: user
+                multiplier: multiplier.toFixed(2),
+                newCash: user.cash,
+                newTotal: user.total,
+                game: gameType
             };
+            
         } else {
+            // হারলে
             user.cash -= amount;
             user.totalSpent += amount;
             user.gambleLosses += 1;
+            user.lastUpdated = Date.now();
             
             this.logTransaction(userId, 'gamble_loss', amount, { game: gameType });
             this.saveData();
@@ -215,19 +233,112 @@ class EconomySystem {
                 success: true,
                 win: false,
                 amount: amount,
-                user: user
+                newCash: user.cash,
+                newTotal: user.total,
+                game: gameType
             };
         }
     }
 
-    // ডেইলি টাস্ক
+    // ✅ VIP সিস্টেম (ঠিকভাবে কাজ করবে)
+    getVipPlans() {
+        return {
+            1: { name: "Bronze VIP", price: 10000000, dailyBonus: 100000, color: "🟤" },
+            2: { name: "Silver VIP", price: 30000000, dailyBonus: 300000, color: "⚪" },
+            3: { name: "Gold VIP", price: 69000000, dailyBonus: 690000, color: "🟡" },
+            4: { name: "Diamond VIP", price: 109000000, dailyBonus: 1090000, color: "🔷" },
+            5: { name: "Royal VIP", price: 1000000000, dailyBonus: 5000000, color: "👑" }
+        };
+    }
+
+    buyVip(userId, vipLevel) {
+        const user = this.getUser(userId);
+        const vipPlans = this.getVipPlans();
+        const plan = vipPlans[vipLevel];
+        
+        if (!plan) {
+            return { success: false, message: 'Invalid VIP level' };
+        }
+        
+        if (user.cash < plan.price) {
+            return { 
+                success: false, 
+                message: `❌ Insufficient cash! You need ${plan.price.toLocaleString()} টাকা, but you have ${user.cash.toLocaleString()} টাকা` 
+            };
+        }
+        
+        // টাকা কাটা
+        user.cash -= plan.price;
+        user.isVip = true;
+        user.vipLevel = vipLevel;
+        
+        // 30 দিনের জন্য VIP
+        const expireDate = new Date();
+        expireDate.setDate(expireDate.getDate() + 30);
+        user.vipExpires = expireDate.getTime();
+        
+        user.totalSpent += plan.price;
+        user.lastUpdated = Date.now();
+        
+        this.logTransaction(userId, 'vip_purchase', plan.price, { vipLevel: vipLevel, plan: plan.name });
+        this.saveData();
+        
+        return {
+            success: true,
+            message: `✅ Successfully purchased ${plan.name}!`,
+            plan: plan,
+            newCash: user.cash,
+            expires: expireDate
+        };
+    }
+
+    claimVipDaily(userId) {
+        const user = this.getUser(userId);
+        
+        if (!user.isVip || user.vipLevel === 0) {
+            return { success: false, message: '❌ You are not a VIP member' };
+        }
+        
+        // VIP এক্সপায়ার চেক
+        if (user.vipExpires && Date.now() > user.vipExpires) {
+            user.isVip = false;
+            user.vipLevel = 0;
+            this.saveData();
+            return { success: false, message: '❌ Your VIP has expired' };
+        }
+        
+        const today = new Date().toDateString();
+        if (user.vipDailyClaimed === today) {
+            return { success: false, message: '❌ You already claimed your VIP daily bonus today' };
+        }
+        
+        const vipPlans = this.getVipPlans();
+        const bonus = vipPlans[user.vipLevel].dailyBonus;
+        
+        user.cash += bonus;
+        user.totalEarned += bonus;
+        user.vipDailyClaimed = today;
+        user.lastUpdated = Date.now();
+        
+        this.logTransaction(userId, 'vip_daily', bonus, { vipLevel: user.vipLevel });
+        this.saveData();
+        
+        return {
+            success: true,
+            message: `✅ Claimed ${bonus.toLocaleString()} টাকা VIP daily bonus!`,
+            bonus: bonus,
+            newCash: user.cash
+        };
+    }
+
+    // ✅ ডেইলি টাস্ক
     completeDailyTask(userId, taskId, reward) {
         const user = this.getUser(userId);
         const today = new Date().toDateString();
         
         // চেক যদি আজকে already claimed
         if (user.dailyTasks && user.dailyTasks[today] && user.dailyTasks[today].includes(taskId)) {
-            return { success: false, message: 'Already claimed this task today' };
+            return { success: false, message: '❌ Already claimed this task today' };
         }
         
         // টাকা যোগ
@@ -239,102 +350,60 @@ class EconomySystem {
         if (!user.dailyTasks[today]) user.dailyTasks[today] = [];
         user.dailyTasks[today].push(taskId);
         
+        user.lastUpdated = Date.now();
+        
         this.logTransaction(userId, 'daily_task', reward, { taskId });
         this.saveData();
         
-        return { success: true, user };
+        return {
+            success: true,
+            message: `✅ Task completed! Received ${reward.toLocaleString()} টাকা`,
+            newCash: user.cash,
+            reward: reward
+        };
     }
 
-    // কাজ করে টাকা আয়
+    // ✅ কাজ করে টাকা আয়
     work(userId, salary) {
         const user = this.getUser(userId);
         const now = Date.now();
         
-        // Cooldown চেক (1 hour)
+        // Cooldown চেক (1 hour = 3600000 ms)
         if (user.lastWork && (now - user.lastWork) < 3600000) {
-            const remaining = Math.ceil((3600000 - (now - user.lastWork)) / 60000);
-            return { success: false, message: `Wait ${remaining} minutes` };
+            const remainingMinutes = Math.ceil((3600000 - (now - user.lastWork)) / 60000);
+            return { 
+                success: false, 
+                message: `⏰ Please wait ${remainingMinutes} minutes before working again` 
+            };
         }
         
         user.cash += salary;
         user.totalEarned += salary;
         user.lastWork = now;
+        user.lastUpdated = Date.now();
         
         this.logTransaction(userId, 'work', salary);
         this.saveData();
         
-        return { success: true, user };
+        return {
+            success: true,
+            message: `✅ Work completed! Earned ${salary.toLocaleString()} টাকা`,
+            newCash: user.cash,
+            salary: salary
+        };
     }
 
-    // VIP কিনা
-    buyVip(userId, vipLevel) {
-        const user = this.getUser(userId);
-        const plan = this.vipPlans[vipLevel];
-        
-        if (!plan) {
-            return { success: false, message: 'Invalid VIP level' };
-        }
-        
-        if (user.cash < plan.price) {
-            return { success: false, message: 'Insufficient cash' };
-        }
-        
-        user.cash -= plan.price;
-        user.isVip = true;
-        user.vipLevel = vipLevel;
-        
-        // 30 দিনের জন্য VIP
-        const expireDate = new Date();
-        expireDate.setDate(expireDate.getDate() + 30);
-        user.vipExpires = expireDate.getTime();
-        
-        user.totalSpent += plan.price;
-        
-        this.logTransaction(userId, 'vip_purchase', plan.price, { vipLevel });
-        this.saveData();
-        
-        return { success: true, user, plan };
-    }
-
-    // VIP ডেইলি বোনাস
-    claimVipDaily(userId) {
-        const user = this.getUser(userId);
-        
-        if (!user.isVip || user.vipLevel === 0) {
-            return { success: false, message: 'You are not VIP' };
-        }
-        
-        // VIP এক্সপায়ার চেক
-        if (user.vipExpires && Date.now() > user.vipExpires) {
-            user.isVip = false;
-            user.vipLevel = 0;
-            this.saveData();
-            return { success: false, message: 'VIP expired' };
-        }
-        
-        const today = new Date().toDateString();
-        if (user.vipDailyClaimed === today) {
-            return { success: false, message: 'Already claimed today' };
-        }
-        
-        const bonus = this.vipPlans[user.vipLevel].dailyBonus;
-        user.cash += bonus;
-        user.totalEarned += bonus;
-        user.vipDailyClaimed = today;
-        
-        this.logTransaction(userId, 'vip_daily', bonus);
-        this.saveData();
-        
-        return { success: true, user, bonus };
-    }
-
-    // লিডারবোর্ড
+    // ✅ লিডারবোর্ড
     getLeaderboard(type = 'total', limit = 10) {
         const users = Object.values(this.data.users);
         
+        if (users.length === 0) {
+            return [];
+        }
+        
         let sortedUsers = [];
         
-        switch(type) {
+        switch(type.toLowerCase()) {
             case 'total':
                 sortedUsers = users.sort((a, b) => (b.cash + b.bank) - (a.cash + a.bank));
                 break;
@@ -350,9 +419,73 @@ class EconomySystem {
             case 'gambling':
                 sortedUsers = users.sort((a, b) => b.gambleWins - a.gambleWins);
                 break;
+            default:
+                sortedUsers = users.sort((a, b) => (b.cash + b.bank) - (a.cash + a.bank));
         }
         
-        return sortedUsers.slice(0, limit);
+        return sortedUsers.slice(0, limit).map((user, index) => ({
+            rank: index + 1,
+            username: user.username,
+            cash: user.cash,
+            bank: user.bank,
+            total: user.total,
+            vipLevel: user.vipLevel,
+            gambleWins: user.gambleWins
+        }));
+    }
+
+    // ✅ রিসেট সিস্টেম (অ্যাডমিনদের জন্য)
+    resetEconomy(type = 'all', adminId) {
+        try {
+            const admin = this.getUser(adminId);
+            
+            switch(type.toLowerCase()) {
+                case 'all':
+                    // সব ডাটা রিসেট
+                    this.data.users = {};
+                    this.data.transactions = [];
+                    this.data.lastReset = Date.now();
+                    this.saveData();
+                    return { 
+                        success: true, 
+                        message: '✅ Complete economy system reset successfully!' 
+                    };
+                    
+                case 'money':
+                    // শুধু টাকা রিসেট
+                    Object.keys(this.data.users).forEach(userId => {
+                        this.data.users[userId].cash = 1000000;
+                        this.data.users[userId].bank = 0;
+                        this.data.users[userId].total = 1000000;
+                        this.data.users[userId].totalEarned = 1000000;
+                        this.data.users[userId].totalSpent = 0;
+                    });
+                    this.saveData();
+                    return { 
+                        success: true, 
+                        message: '✅ All users money reset to 1,000,000 টাকা!' 
+                    };
+                    
+                case 'vip':
+                    // শুধু VIP রিসেট
+                    Object.keys(this.data.users).forEach(userId => {
+                        this.data.users[userId].isVip = false;
+                        this.data.users[userId].vipLevel = 0;
+                        this.data.users[userId].vipExpires = null;
+                    });
+                    this.saveData();
+                    return { 
+                        success: true, 
+                        message: '✅ All VIP memberships removed!' 
+                    };
+                    
+                default:
+                    return { success: false, message: 'Invalid reset type' };
+            }
+        } catch (error) {
+            console.error('Reset error:', error);
+            return { success: false, message: 'Error resetting economy' };
+        }
     }
 
     // ট্রানজেকশন লগ
@@ -363,7 +496,7 @@ class EconomySystem {
             amount,
             details,
             timestamp: Date.now(),
-            date: new Date().toISOString()
+            date: new Date().toLocaleString()
         };
         
         this.data.transactions.push(transaction);
@@ -372,10 +505,12 @@ class EconomySystem {
         if (this.data.transactions.length > 1000) {
             this.data.transactions = this.data.transactions.slice(-1000);
         }
+        
+        this.saveData();
     }
 }
 
-// Global economy instance
+// Create global instance
 const economy = new EconomySystem();
 
 module.exports = economy;
