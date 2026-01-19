@@ -4,7 +4,7 @@ const { commands, aliases } = global.GoatBot;
 module.exports = {
   config: {
     name: "help",
-    version: "1.17",
+    version: "2.0",
     author: "RAFI | Developer",
     countDown: 5,
     role: 0,
@@ -32,6 +32,29 @@ module.exports = {
 
       msg += `╭─────────⭓\n│ ⭐ RAFI BOT HELP MENU ⭐\n╰─────────⭓\n`; 
 
+      // প্রথমে ECONOMY ক্যাটাগরি
+      const economyCommands = [
+        'balance',
+        'deposit', 
+        'withdraw',
+        'transfer',
+        'bank',
+        'gamble',
+        'gambletop',
+        'stats',
+        'leaderboard',
+        'vip',
+        'vipshop',
+        'reset'
+      ];
+
+      // VIP কমান্ডগুলোর জন্য আলাদা লিস্ট
+      const vipCommands = [
+        'vip',
+        'vipshop'
+      ];
+
+      // অন্যান্য কমান্ড ক্যাটাগরাইজ করুন
       for (const [name, value] of commands) {
         if (value.config.role > 1 && role < value.config.role) continue;
 
@@ -40,27 +63,26 @@ module.exports = {
         categories[category].commands.push(name);
       }
 
-      // First show ECONOMY category at top
-      if (categories["economy"]) {
-        msg += `\n╭─────⭓ ECONOMY`;
-        const names = categories["economy"].commands.sort();
-        for (let i = 0; i < names.length; i += 3) {
-          const cmds = names.slice(i, i + 2).map((item) => `💰 ${item}`);
-          msg += `\n│${cmds.join(" ".repeat(Math.max(1, 5 - cmds.join("").length)))}`;
-        }
-        msg += `\n╰────────────⭓\n`;
-        delete categories["economy"];
-      }
+      // ECONOMY সেকশন শো করানো হচ্ছে না কারণ আমরা আলাদাভাবে শো করাব
+      delete categories["economy"];
 
-      // Then show other categories
+      // প্রথমে ECONOMY কমান্ড শো করুন
+      msg += `\n╭─────⭓ ECONOMY`;
+      for (let i = 0; i < economyCommands.length; i += 3) {
+        const cmds = economyCommands.slice(i, i + 3).map((item) => `💰 ${item}`);
+        msg += `\n│${cmds.join(" ".repeat(Math.max(1, 15 - cmds.join("").length)))}`;
+      }
+      msg += `\n╰────────────⭓\n`;
+
+      // তারপর অন্যান্য ক্যাটাগরি
       Object.keys(categories).forEach((category) => {
         if (category !== "info") {
           msg += `\n╭─────⭓ ${category.toUpperCase()}`;
 
           const names = categories[category].commands.sort();
           for (let i = 0; i < names.length; i += 3) {
-            const cmds = names.slice(i, i + 2).map((item) => `✧${item}`);
-            msg += `\n│${cmds.join(" ".repeat(Math.max(1, 5 - cmds.join("").length)))}`;
+            const cmds = names.slice(i, i + 3).map((item) => `✧${item}`);
+            msg += `\n│${cmds.join(" ".repeat(Math.max(1, 15 - cmds.join("").length)))}`;
           }
 
           msg += `\n╰────────────⭓\n`;
@@ -69,6 +91,8 @@ module.exports = {
 
       const totalCommands = commands.size;
       msg += `\n\n⭔ RAFI Bot has ${totalCommands} commands\n⭔ Type ${prefix}help <command name> to learn Usage\n`;
+      
+      // 📌 ECONOMY COMMANDS DETAILS
       msg += `\n📌 ECONOMY COMMANDS:\n`;
       msg += `💰 balance - Check your balance\n`;
       msg += `💰 deposit [amount] - Deposit to bank\n`;
@@ -76,10 +100,44 @@ module.exports = {
       msg += `💰 transfer [amount] [@user] - Transfer money\n`;
       msg += `💰 bank - View bank details\n`;
       msg += `💰 leaderboard - Top 10 richest\n`;
+      
+      // 🎰 GAMBLING COMMANDS
+      msg += `\n🎰 GAMBLING COMMANDS:\n`;
+      msg += `🎲 gamble [amount] [game] - Play gambling games\n`;
+      msg += `📊 stats - View your statistics\n`;
+      msg += `🏆 gambletop - Top gamblers\n`;
+      msg += `🎮 Games: normal, coinflip, dice, slots\n`;
+      
+      // 💎 VIP SYSTEM
+      msg += `\n💎 VIP SYSTEM:\n`;
+      msg += `✨ vip plans - View VIP packages\n`;
+      msg += `✨ vip buy [level] - Purchase VIP\n`;
+      msg += `✨ vip status - Check VIP status\n`;
+      msg += `✨ vip daily - Claim daily bonus\n`;
+      msg += `✨ vip leaderboard - Top VIP members\n`;
+      msg += `✨ vipshop - VIP exclusive shop\n`;
+      msg += `✨ vip casino [amount] - VIP Casino\n`;
+      msg += `✨ vip double - Double daily (Gold+)\n`;
+      
+      // VIP BENEFITS
+      msg += `\n🌟 VIP BENEFITS:\n`;
+      msg += `✅ Daily Cash Bonus (50K - 1M টাকা)\n`;
+      msg += `✅ Higher Gambling Win Chance (+5% to +25%)\n`;
+      msg += `✅ Transfer Bonuses (+2% to +15% extra)\n`;
+      msg += `✅ Special VIP Commands\n`;
+      msg += `✅ VIP Casino Access\n`;
+      msg += `✅ Double Daily Bonus (Gold+)\n`;
+      msg += `✅ Exclusive VIP Shop\n`;
+      
+      // ADMIN ECONOMY
       msg += `\n👑 ADMIN ECONOMY:\n`;
       msg += `⚡ admin add [@user] [amount]\n`;
       msg += `⚡ admin remove [@user] [amount]\n`;
       msg += `⚡ admin set [@user] [true/false]\n`;
+      
+      // RESET SYSTEM
+      msg += `\n🔄 RESET SYSTEM:\n`;
+      msg += `⚡ reset [all/user/transactions] - Economy reset (Admin only)\n`;
       
       msg += `\n╭─✦ DEVELOPER: RAFI\n├‣ FACEBOOK\n╰‣: https://www.facebook.com/share/1AT5HsAFqC/`;
 
@@ -134,4 +192,4 @@ function roleTextToString(roleText) {
     default:
       return "Unknown role";
   }
-}
+    }
