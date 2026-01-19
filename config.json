@@ -1,7 +1,7 @@
 {
   "facebookAccount": {
-    "email": "mahmudx077@gmail.com",
-    "password": "",
+    "email": "blueberryfree00@gmail.com",
+    "password": "RAFIEXY69",
     "2FASecret": "",
     "i_user": "",
     "proxy": null,
@@ -17,14 +17,14 @@
     "ignoreCommand": []
   },
   "adminBot": [
-    "100037951718438"
+    "61555603974360"
   ],
   "whiteListMode": {
     "enable": false,
     "whiteListIds": [],
     "notes": "if you enable this feature, only the ids in the whiteListIds section can use the bot"
   },
-  "nickNameBot": "Your Hinata Baby",
+  "nickNameBot": "RAFI BOT",
   "prefix": "!",
   "database": {
     "type": "sqlite",
