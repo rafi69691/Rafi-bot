@@ -1,564 +1,381 @@
 // economy.js
-const { User, Transaction } = require('./models/User');
+const fs = require('fs');
+const path = require('path');
 
 class EconomySystem {
     constructor() {
-        this.MAX_CASH = 1000000000000;
-        this.MAX_BANK = 1000000000000;
+        this.dataPath = path.join(__dirname, 'data/economy.json');
+        this.loadData();
         
-        // VIP Pricing and Benefits
-        this.VIP_PLANS = {
-            1: { name: "Bronze VIP", price: 5000000, duration: 7, color: "🟤", dailyBonus: 50000, gambleBonus: 5, transferBonus: 2 },
-            2: { name: "Silver VIP", price: 15000000, duration: 15, color: "⚪", dailyBonus: 150000, gambleBonus: 10, transferBonus: 5 },
-            3: { name: "Gold VIP", price: 30000000, duration: 30, color: "🟡", dailyBonus: 300000, gambleBonus: 15, transferBonus: 8 },
-            4: { name: "Diamond VIP", price: 50000000, duration: 30, color: "🔷", dailyBonus: 500000, gambleBonus: 20, transferBonus: 12 },
-            5: { name: "Royal VIP", price: 100000000, duration: 30, color: "👑", dailyBonus: 1000000, gambleBonus: 25, transferBonus: 15 }
+        // VIP প্রাইস
+        this.vipPlans = {
+            1: { name: "Bronze VIP", price: 10000000, dailyBonus: 100000 },
+            2: { name: "Silver VIP", price: 30000000, dailyBonus: 300000 },
+            3: { name: "Gold VIP", price: 69000000, dailyBonus: 690000 },
+            4: { name: "Diamond VIP", price: 109000000, dailyBonus: 1090000 },
+            5: { name: "Royal VIP", price: 1000000000, dailyBonus: 5000000 }
         };
     }
 
-    // ইউজার তৈরি বা পাওয়া
-    async getUser(userId, username = 'User') {
-        let user = await User.findOne({ userId });
-        
-        if (!user) {
-            user = await User.create({
-                userId,
-                username,
-                cash: 1000000000,
-                bank: 0
-            });
-        } else if (username !== 'User' && user.username !== username) {
-            user.username = username;
-            await user.save();
+    loadData() {
+        try {
+            if (fs.existsSync(this.dataPath)) {
+                this.data = JSON.parse(fs.readFileSync(this.dataPath, 'utf8'));
+            } else {
+                this.data = { users: {}, transactions: [] };
+                this.saveData();
+            }
+        } catch (error) {
+            console.error('Error loading economy data:', error);
+            this.data = { users: {}, transactions: [] };
         }
+    }
+
+    saveData() {
+        try {
+            const dir = path.dirname(this.dataPath);
+            if (!fs.existsSync(dir)) {
+                fs.mkdirSync(dir, { recursive: true });
+            }
+            fs.writeFileSync(this.dataPath, JSON.stringify(this.data, null, 2));
+        } catch (error) {
+            console.error('Error saving economy data:', error);
+        }
+    }
+
+    // ইউজার ডাটা পাওয়া
+    getUser(userId, username = 'User') {
+        if (!this.data.users[userId]) {
+            this.data.users[userId] = {
+                userId: userId,
+                username: username,
+                cash: 1000000, // Starting cash 1 million
+                bank: 0,
+                total: 1000000,
+                isVip: false,
+                vipLevel: 0,
+                vipExpires: null,
+                dailyClaimed: null,
+                vipDailyClaimed: null,
+                totalEarned: 0,
+                totalSpent: 0,
+                gambleWins: 0,
+                gambleLosses: 0,
+                dailyTasks: {},
+                lastWork: null,
+                level: 1,
+                xp: 0
+            };
+            this.saveData();
+        } else if (username !== 'User' && this.data.users[userId].username !== username) {
+            this.data.users[userId].username = username;
+            this.saveData();
+        }
+        
+        return this.data.users[userId];
+    }
+
+    // ব্যালেন্স চেক
+    checkBalance(userId) {
+        const user = this.getUser(userId);
+        user.total = user.cash + user.bank;
+        this.saveData();
+        return user;
+    }
+
+    // টাকা যোগ
+    addMoney(userId, amount, type = 'cash', reason = 'Added') {
+        const user = this.getUser(userId);
+        
+        if (type === 'cash') {
+            user.cash += amount;
+        } else if (type === 'bank') {
+            user.bank += amount;
+        }
+        
+        user.total = user.cash + user.bank;
+        user.totalEarned += amount;
+        
+        this.logTransaction(userId, 'add', amount, { reason });
+        this.saveData();
         
         return user;
     }
 
-    // VIP Benefits Check
-    async getVipBenefits(userId) {
-        const user = await this.getUser(userId);
-        const vipInfo = user.getVipInfo();
-        const hasActiveVip = user.hasVipBenefits();
+    // টাকা কমান
+    removeMoney(userId, amount, type = 'cash', reason = 'Removed') {
+        const user = this.getUser(userId);
         
-        return {
-            isVip: user.isVip,
-            vipLevel: user.vipLevel,
-            vipName: vipInfo.name,
-            vipColor: vipInfo.color,
-            dailyBonus: vipInfo.dailyBonus,
-            gambleBonus: vipInfo.gambleBonus,
-            transferBonus: vipInfo.transferBonus,
-            expires: user.vipExpires,
-            hasActiveVip: hasActiveVip,
-            daysLeft: hasActiveVip ? 
-                Math.ceil((user.vipExpires - new Date()) / (1000 * 60 * 60 * 24)) : 0
-        };
-    }
-
-    // VIP কিনা
-    async purchaseVip(userId, vipLevel) {
-        const user = await this.getUser(userId);
-        const vipPlan = this.VIP_PLANS[vipLevel];
-        
-        if (!vipPlan) {
-            return { success: false, message: 'Invalid VIP level' };
+        if (type === 'cash' && user.cash < amount) {
+            return { success: false, message: 'Insufficient cash' };
+        }
+        if (type === 'bank' && user.bank < amount) {
+            return { success: false, message: 'Insufficient bank balance' };
         }
         
-        if (user.cash < vipPlan.price) {
-            return { success: false, message: `Insufficient cash! You need ${vipPlan.price.toLocaleString()} টাকা` };
-        }
-        
-        // Calculate expiration date
-        const expireDate = new Date();
-        expireDate.setDate(expireDate.getDate() + vipPlan.duration);
-        
-        // Apply VIP
-        user.cash -= vipPlan.price;
-        user.isVip = true;
-        user.vipLevel = vipLevel;
-        user.vipExpires = expireDate;
-        user.vipPurchases += 1;
-        user.totalSpent += vipPlan.price;
-        
-        await user.save();
-        
-        // Log transaction
-        await this.logTransaction(userId, 'vip_purchase', vipPlan.price, {
-            description: `Purchased ${vipPlan.name} for ${vipPlan.duration} days`,
-            vipLevel: vipLevel
-        });
-        
-        return {
-            success: true,
-            message: `🎉 **Congratulations!** 🎉\n\n` +
-                    `✅ Successfully purchased **${vipPlan.name}**!\n` +
-                    `💰 Price: ${vipPlan.price.toLocaleString()} টাকা\n` +
-                    `📅 Duration: ${vipPlan.duration} days\n` +
-                    `⏰ Expires: ${expireDate.toLocaleDateString()}\n\n` +
-                    `✨ **Benefits Activated:**\n` +
-                    `• Daily Bonus: ${vipPlan.dailyBonus.toLocaleString()} টাকা\n` +
-                    `• Gambling Bonus: +${vipPlan.gambleBonus}% win chance\n` +
-                    `• Transfer Bonus: +${vipPlan.transferBonus}% extra cash\n` +
-                    `• Special Commands Access`,
-            vipPlan: vipPlan,
-            expires: expireDate
-        };
-    }
-
-    // VIP Daily Bonus Claim
-    async claimVipDaily(userId) {
-        const user = await this.getUser(userId);
-        const vipBenefits = await this.getVipBenefits(userId);
-        
-        if (!vipBenefits.hasActiveVip) {
-            return { success: false, message: 'You are not an active VIP member' };
-        }
-        
-        // Check if already claimed today
-        const now = new Date();
-        const lastClaim = user.vipDailyClaimed;
-        
-        if (lastClaim) {
-            const lastClaimDate = new Date(lastClaim);
-            if (lastClaimDate.toDateString() === now.toDateString()) {
-                const nextClaim = new Date(lastClaimDate);
-                nextClaim.setDate(nextClaim.getDate() + 1);
-                nextClaim.setHours(0, 0, 0, 0);
-                
-                const hoursLeft = Math.ceil((nextClaim - now) / (1000 * 60 * 60));
-                return { 
-                    success: false, 
-                    message: `You already claimed your VIP bonus today!\nNext bonus available in ${hoursLeft} hours.`
-                };
-            }
-        }
-        
-        // Give daily bonus
-        const dailyBonus = vipBenefits.dailyBonus;
-        user.cash += dailyBonus;
-        user.totalEarned += dailyBonus;
-        user.totalVipBenefits += dailyBonus;
-        user.vipDailyClaimed = now;
-        
-        await user.save();
-        
-        await this.logTransaction(userId, 'vip_daily', dailyBonus, {
-            description: `Claimed VIP daily bonus`,
-            vipLevel: user.vipLevel
-        });
-        
-        return {
-            success: true,
-            message: `🎁 **VIP Daily Bonus Claimed!** 🎁\n\n` +
-                    `💰 Received: ${dailyBonus.toLocaleString()} টাকা\n` +
-                    `💵 New Cash: ${user.cash.toLocaleString()} টাকা\n` +
-                    `📅 Next bonus available tomorrow\n\n` +
-                    `✨ VIP Level: ${vipBenefits.vipColor} ${vipBenefits.vipName}\n` +
-                    `⏰ VIP Expires in: ${vipBenefits.daysLeft} days`,
-            bonus: dailyBonus,
-            newCash: user.cash
-        };
-    }
-
-    // VIP Gambling Bonus (Enhanced gambling for VIPs)
-    async vipGamble(userId, amount, gameType = 'normal') {
-        const user = await this.getUser(userId);
-        const vipBenefits = await this.getVipBenefits(userId);
-        
-        if (amount <= 0) return { success: false, message: 'Amount must be positive' };
-        if (amount > user.cash) return { success: false, message: 'Insufficient cash' };
-        
-        const MIN_BET = 100;
-        const MAX_BET = vipBenefits.hasActiveVip ? 5000000 : 1000000; // VIPs can bet more
-        
-        if (amount < MIN_BET) return { success: false, message: `Minimum bet is ${MIN_BET}` };
-        if (amount > MAX_BET) return { success: false, message: `Maximum bet is ${MAX_BET.toLocaleString()}` };
-        
-        // Enhanced win chance for VIPs
-        let baseWinChance = 45;
-        if (vipBenefits.hasActiveVip) {
-            baseWinChance += vipBenefits.gambleBonus;
-        }
-        
-        const random = Math.random() * 100;
-        const isWin = random <= baseWinChance;
-        
-        // Enhanced multiplier for VIPs
-        let baseMultiplier = 1.5;
-        let maxMultiplier = 3.0;
-        
-        if (vipBenefits.hasActiveVip) {
-            baseMultiplier += vipBenefits.vipLevel * 0.1;
-            maxMultiplier += vipBenefits.vipLevel * 0.2;
-        }
-        
-        const winMultiplier = baseMultiplier + Math.random() * (maxMultiplier - baseMultiplier);
-        const winAmount = Math.floor(amount * winMultiplier);
-        
-        if (isWin) {
-            // Extra bonus for VIPs
-            let vipBonus = 0;
-            if (vipBenefits.hasActiveVip) {
-                vipBonus = Math.floor(winAmount * 0.05 * vipBenefits.vipLevel); // 5% extra per level
-            }
-            
-            const totalWin = winAmount + vipBonus;
-            
-            user.cash += totalWin;
-            user.totalEarned += totalWin;
-            user.gambleWins += 1;
-            user.totalVipBenefits += vipBonus;
-            await user.save();
-            
-            await this.logTransaction(userId, 'vip_gamble_win', totalWin, {
-                description: `Won VIP gamble (bonus: ${vipBonus})`,
-                vipLevel: user.vipLevel
-            });
-            
-            let vipMessage = '';
-            if (vipBonus > 0) {
-                vipMessage = `✨ **VIP BONUS:** +${vipBonus.toLocaleString()} টাকা\n`;
-            }
-            
-            return {
-                success: true,
-                win: true,
-                message: `🎉 **VIP GAMBLE - JACKPOT!** 🎉\n\n` +
-                        `💰 Bet: ${amount.toLocaleString()} টাকা\n` +
-                        `🎰 Game: ${gameType}\n` +
-                        `📈 Multiplier: ${winMultiplier.toFixed(2)}x\n` +
-                        `💰 Won: ${winAmount.toLocaleString()} টাকা\n` +
-                        vipMessage +
-                        `💰 Total Won: ${totalWin.toLocaleString()} টাকা\n` +
-                        `💵 New Cash: ${user.cash.toLocaleString()} টাকা\n` +
-                        `✨ VIP Win Chance: ${baseWinChance}%`,
-                amountWon: totalWin,
-                vipBonus: vipBonus
-            };
-        } else {
+        if (type === 'cash') {
             user.cash -= amount;
-            user.totalSpent += amount;
-            user.gambleLosses += 1;
-            await user.save();
-            
-            await this.logTransaction(userId, 'gamble_lose', amount, {
-                description: `Lost gamble`,
-                vipLevel: user.vipLevel
-            });
-            
-            return {
-                success: true,
-                win: false,
-                message: `😔 **Better Luck Next Time!**\n\n` +
-                        `💰 Bet: ${amount.toLocaleString()} টাকা\n` +
-                        `🎰 Game: ${gameType}\n` +
-                        `💸 Lost: ${amount.toLocaleString()} টাকা\n` +
-                        `💵 New Cash: ${user.cash.toLocaleString()} টাকা\n` +
-                        (vipBenefits.hasActiveVip ? 
-                         `✨ Your VIP Win Chance: ${baseWinChance}%\n` : 
-                         `🎰 Win Chance: ${baseWinChance}%\n`) +
-                        `💡 VIP members have higher win chances!`,
-                amountLost: amount
-            };
+        } else if (type === 'bank') {
+            user.bank -= amount;
         }
+        
+        user.total = user.cash + user.bank;
+        user.totalSpent += amount;
+        
+        this.logTransaction(userId, 'remove', amount, { reason });
+        this.saveData();
+        
+        return { success: true, user };
     }
 
-    // VIP Transfer Bonus
-    async vipTransfer(senderId, receiverId, amount) {
-        const sender = await this.getUser(senderId);
-        const receiver = await this.getUser(receiverId);
-        const senderVip = await this.getVipBenefits(senderId);
+    // ট্রান্সফার
+    transferMoney(senderId, receiverId, amount) {
+        const sender = this.getUser(senderId);
+        const receiver = this.getUser(receiverId);
         
-        if (senderId === receiverId) {
-            return { success: false, message: 'You cannot transfer money to yourself!' };
+        if (sender.bank < amount) {
+            return { success: false, message: 'Insufficient bank balance' };
         }
         
-        if (amount <= 0) return { success: false, message: 'Amount must be positive' };
-        if (amount > sender.bank) return { success: false, message: 'Insufficient bank balance' };
-        
-        // VIP Transfer Bonus
+        // VIP বোনাস চেক
         let vipBonus = 0;
-        if (senderVip.hasActiveVip) {
-            vipBonus = Math.floor(amount * (senderVip.transferBonus / 100));
+        if (sender.vipLevel >= 1) {
+            vipBonus = Math.floor(amount * (sender.vipLevel * 0.01));
         }
         
         const totalAmount = amount + vipBonus;
         
-        // Check limits
-        if (receiver.bank + totalAmount > this.MAX_BANK) {
-            return { 
-                success: false, 
-                message: `Receiver's bank limit reached!`
-            };
-        }
-        
         sender.bank -= amount;
         receiver.bank += totalAmount;
         
-        // Update stats
+        sender.total = sender.cash + sender.bank;
+        receiver.total = receiver.cash + receiver.bank;
+        
         sender.totalSpent += amount;
         receiver.totalEarned += totalAmount;
         
-        if (vipBonus > 0) {
-            receiver.totalVipBenefits += vipBonus;
-        }
+        // ট্রানজেকশন লগ
+        this.logTransaction(senderId, 'transfer_sent', amount, { to: receiverId, vipBonus });
+        this.logTransaction(receiverId, 'transfer_received', totalAmount, { from: senderId, vipBonus });
         
-        await sender.save();
-        await receiver.save();
-        
-        // Log transactions
-        await this.logTransaction(senderId, 'vip_transfer_sent', amount, {
-            toUser: receiver.username,
-            description: `Transferred with VIP bonus: ${vipBonus}`,
-            vipLevel: sender.vipLevel
-        });
-        
-        await this.logTransaction(receiverId, 'vip_transfer_received', totalAmount, {
-            fromUser: sender.username,
-            description: `Received with VIP bonus: ${vipBonus}`,
-            vipLevel: sender.vipLevel
-        });
-        
-        let bonusMessage = '';
-        if (vipBonus > 0) {
-            bonusMessage = `✨ **VIP BONUS:** +${vipBonus.toLocaleString()} টাকা\n`;
-        }
+        this.saveData();
         
         return {
             success: true,
-            message: `✅ **VIP Transfer Successful!** ✅\n\n` +
-                    `💰 Amount: ${amount.toLocaleString()} টাকা\n` +
-                    bonusMessage +
-                    `💰 Total Sent: ${totalAmount.toLocaleString()} টাকা\n` +
-                    `👤 To: ${receiver.username}\n` +
-                    `🏦 Your Bank: ${sender.bank.toLocaleString()} টাকা\n` +
-                    (senderVip.hasActiveVip ? 
-                     `✨ Your VIP Level: ${senderVip.vipColor} ${senderVip.vipName}\n` +
-                     `🎁 Transfer Bonus: +${senderVip.transferBonus}%` : ''),
-            totalAmount: totalAmount,
-            vipBonus: vipBonus
+            sender: sender,
+            receiver: receiver,
+            vipBonus: vipBonus,
+            totalAmount: totalAmount
         };
     }
 
-    // Check VIP Status
-    async checkVipStatus(userId) {
-        const user = await this.getUser(userId);
-        const vipBenefits = await this.getVipBenefits(userId);
+    // গ্যাম্বলিং
+    gamble(userId, amount, gameType) {
+        const user = this.getUser(userId);
         
-        if (!vipBenefits.hasActiveVip) {
-            return {
-                isVip: false,
-                message: `❌ **You are not a VIP member!**\n\n` +
-                        `✨ Purchase VIP to unlock amazing benefits:\n` +
-                        `• Daily Cash Bonus\n` +
-                        `• Higher Gambling Win Chance\n` +
-                        `• Transfer Bonuses\n` +
-                        `• Special Commands\n\n` +
-                        `💎 Use !vip buy to see available plans`
-            };
+        if (user.cash < amount) {
+            return { success: false, message: 'Insufficient cash' };
         }
         
-        const vipPlan = this.VIP_PLANS[user.vipLevel];
-        
-        return {
-            isVip: true,
-            message: `🌟 **VIP STATUS** 🌟\n\n` +
-                    `✨ Level: ${vipBenefits.vipColor} **${vipBenefits.vipName}**\n` +
-                    `💰 Daily Bonus: ${vipPlan.dailyBonus.toLocaleString()} টাকা\n` +
-                    `🎰 Gambling Bonus: +${vipPlan.gambleBonus}% win chance\n` +
-                    `💸 Transfer Bonus: +${vipPlan.transferBonus}% extra cash\n` +
-                    `📅 Expires: ${user.vipExpires.toLocaleDateString()}\n` +
-                    `⏰ Days Left: ${vipBenefits.daysLeft} days\n\n` +
-                    `💎 **Total VIP Benefits Received:** ${user.totalVipBenefits.toLocaleString()} টাকা\n` +
-                    `🎁 Use !vip daily to claim daily bonus`,
-            vipInfo: vipBenefits,
-            daysLeft: vipBenefits.daysLeft,
-            totalBenefits: user.totalVipBenefits
-        };
-    }
-
-    // VIP Leaderboard
-    async getVipLeaderboard(limit = 10) {
-        const users = await User.find({ isVip: true, vipExpires: { $gt: new Date() } })
-            .sort({ vipLevel: -1, totalVipBenefits: -1 })
-            .limit(limit);
-        
-        return users.map((user, index) => {
-            const vipInfo = user.getVipInfo();
-            return {
-                rank: index + 1,
-                username: user.username,
-                vipLevel: user.vipLevel,
-                vipName: vipInfo.name,
-                vipColor: vipInfo.color,
-                totalBenefits: user.totalVipBenefits,
-                daysLeft: Math.ceil((user.vipExpires - new Date()) / (1000 * 60 * 60 * 24))
-            };
-        });
-    }
-
-    // Renew VIP
-    async renewVip(userId, vipLevel) {
-        const user = await this.getUser(userId);
-        const vipPlan = this.VIP_PLANS[vipLevel];
-        
-        if (!vipPlan) {
-            return { success: false, message: 'Invalid VIP level' };
+        // VIP বোনাস
+        let winChance = 45;
+        if (user.vipLevel >= 1) {
+            winChance += (user.vipLevel * 5);
         }
         
-        if (user.cash < vipPlan.price) {
-            return { success: false, message: `Insufficient cash! You need ${vipPlan.price.toLocaleString()} টাকা` };
-        }
-        
-        // Calculate new expiration date
-        let expireDate = new Date();
-        if (user.vipExpires && user.vipExpires > new Date()) {
-            // Add to existing VIP
-            expireDate = new Date(user.vipExpires);
-        }
-        expireDate.setDate(expireDate.getDate() + vipPlan.duration);
-        
-        // Apply VIP
-        user.cash -= vipPlan.price;
-        user.isVip = true;
-        user.vipLevel = vipLevel;
-        user.vipExpires = expireDate;
-        user.vipPurchases += 1;
-        user.totalSpent += vipPlan.price;
-        
-        await user.save();
-        
-        await this.logTransaction(userId, 'vip_renew', vipPlan.price, {
-            description: `Renewed ${vipPlan.name} for ${vipPlan.duration} days`,
-            vipLevel: vipLevel
-        });
-        
-        return {
-            success: true,
-            message: `♻️ **VIP Renewed Successfully!** ♻️\n\n` +
-                    `✅ Renewed **${vipPlan.name}**\n` +
-                    `💰 Price: ${vipPlan.price.toLocaleString()} টাকা\n` +
-                    `📅 New Expiry: ${expireDate.toLocaleDateString()}\n` +
-                    `⏰ Total Duration: ${vipPlan.duration} days added\n\n` +
-                    `✨ Continue enjoying VIP benefits!`,
-            vipPlan: vipPlan,
-            expires: expireDate
-        };
-    }
-
-    // Special VIP Command: Double Daily
-    async vipDoubleDaily(userId) {
-        const user = await this.getUser(userId);
-        const vipBenefits = await this.getVipBenefits(userId);
-        
-        if (!vipBenefits.hasActiveVip || vipBenefits.vipLevel < 3) {
-            return { 
-                success: false, 
-                message: 'This feature requires Gold VIP or higher!'
-            };
-        }
-        
-        // Check if already used today
-        const now = new Date();
-        if (user.lastVipReward && user.lastVipReward.toDateString() === now.toDateString()) {
-            return { 
-                success: false, 
-                message: 'You have already used VIP Double Daily today!'
-            };
-        }
-        
-        const doubleBonus = vipBenefits.dailyBonus * 2;
-        user.cash += doubleBonus;
-        user.totalEarned += doubleBonus;
-        user.totalVipBenefits += doubleBonus;
-        user.lastVipReward = now;
-        
-        await user.save();
-        
-        await this.logTransaction(userId, 'vip_double_daily', doubleBonus, {
-            description: 'VIP Double Daily bonus claimed',
-            vipLevel: user.vipLevel
-        });
-        
-        return {
-            success: true,
-            message: `🎁 **VIP DOUBLE DAILY BONUS!** 🎁\n\n` +
-                    `💰 Received: ${doubleBonus.toLocaleString()} টাকা\n` +
-                    `✨ Regular Bonus: ${vipBenefits.dailyBonus.toLocaleString()} টাকা\n` +
-                    `✨ Extra Bonus: ${vipBenefits.dailyBonus.toLocaleString()} টাকা\n` +
-                    `💵 New Cash: ${user.cash.toLocaleString()} টাকা\n\n` +
-                    `🌟 VIP Level: ${vipBenefits.vipColor} ${vipBenefits.vipName}\n` +
-                    `⏰ Available once daily for Gold+ VIPs`,
-            bonus: doubleBonus
-        };
-    }
-
-    // VIP Casino (Special high-stakes gambling for VIPs)
-    async vipCasino(userId, amount) {
-        const user = await this.getUser(userId);
-        const vipBenefits = await this.getVipBenefits(userId);
-        
-        if (!vipBenefits.hasActiveVip || vipBenefits.vipLevel < 2) {
-            return { 
-                success: false, 
-                message: 'VIP Casino requires Silver VIP or higher!'
-            };
-        }
-        
-        const MIN_BET = 10000;
-        const MAX_BET = 10000000;
-        
-        if (amount < MIN_BET) return { success: false, message: `Minimum bet for VIP Casino is ${MIN_BET.toLocaleString()}` };
-        if (amount > MAX_BET) return { success: false, message: `Maximum bet for VIP Casino is ${MAX_BET.toLocaleString()}` };
-        if (amount > user.cash) return { success: false, message: 'Insufficient cash' };
-        
-        // VIP Casino has better odds
-        const winChance = 40 + (vipBenefits.vipLevel * 3); // 46% to 55%
-        const random = Math.random() * 100;
-        const isWin = random <= winChance;
-        
-        const multiplier = 2 + (vipBenefits.vipLevel * 0.5); // 2.5x to 4.5x
-        const winAmount = Math.floor(amount * multiplier);
+        const isWin = Math.random() * 100 <= winChance;
         
         if (isWin) {
+            const multiplier = 1.5 + Math.random() * 2.5; // 1.5x - 4x
+            const winAmount = Math.floor(amount * multiplier);
+            
             user.cash += winAmount;
             user.totalEarned += winAmount;
             user.gambleWins += 1;
-            user.totalVipBenefits += (winAmount - amount);
-            await user.save();
+            
+            this.logTransaction(userId, 'gamble_win', winAmount, { game: gameType, bet: amount });
+            this.saveData();
             
             return {
                 success: true,
                 win: true,
-                message: `🎰 **VIP CASINO JACKPOT!** 🎰\n\n` +
-                        `💰 Bet: ${amount.toLocaleString()} টাকা\n` +
-                        `📈 Multiplier: ${multiplier.toFixed(1)}x\n` +
-                        `💰 Won: ${winAmount.toLocaleString()} টাকা\n` +
-                        `✨ Profit: ${(winAmount - amount).toLocaleString()} টাকা\n` +
-                        `💵 New Cash: ${user.cash.toLocaleString()} টাকা\n\n` +
-                        `🌟 Exclusive VIP Casino Win Chance: ${winChance}%`,
-                amountWon: winAmount
+                amount: winAmount,
+                multiplier: multiplier,
+                user: user
             };
         } else {
             user.cash -= amount;
             user.totalSpent += amount;
             user.gambleLosses += 1;
-            await user.save();
+            
+            this.logTransaction(userId, 'gamble_loss', amount, { game: gameType });
+            this.saveData();
             
             return {
                 success: true,
                 win: false,
-                message: `🎰 **VIP CASINO** 🎰\n\n` +
-                        `💰 Bet: ${amount.toLocaleString()} টাকা\n` +
-                        `💸 Lost: ${amount.toLocaleString()} টাকা\n` +
-                        `💵 New Cash: ${user.cash.toLocaleString()} টাকা\n\n` +
-                        `🌟 VIP Casino Win Chance: ${winChance}%\n` +
-                        `💡 Try again, high risk high reward!`,
-                amountLost: amount
+                amount: amount,
+                user: user
             };
+        }
+    }
+
+    // ডেইলি টাস্ক
+    completeDailyTask(userId, taskId, reward) {
+        const user = this.getUser(userId);
+        const today = new Date().toDateString();
+        
+        // চেক যদি আজকে already claimed
+        if (user.dailyTasks && user.dailyTasks[today] && user.dailyTasks[today].includes(taskId)) {
+            return { success: false, message: 'Already claimed this task today' };
+        }
+        
+        // টাকা যোগ
+        user.cash += reward;
+        user.totalEarned += reward;
+        
+        // টাস্ক মার্ক
+        if (!user.dailyTasks) user.dailyTasks = {};
+        if (!user.dailyTasks[today]) user.dailyTasks[today] = [];
+        user.dailyTasks[today].push(taskId);
+        
+        this.logTransaction(userId, 'daily_task', reward, { taskId });
+        this.saveData();
+        
+        return { success: true, user };
+    }
+
+    // কাজ করে টাকা আয়
+    work(userId, salary) {
+        const user = this.getUser(userId);
+        const now = Date.now();
+        
+        // Cooldown চেক (1 hour)
+        if (user.lastWork && (now - user.lastWork) < 3600000) {
+            const remaining = Math.ceil((3600000 - (now - user.lastWork)) / 60000);
+            return { success: false, message: `Wait ${remaining} minutes` };
+        }
+        
+        user.cash += salary;
+        user.totalEarned += salary;
+        user.lastWork = now;
+        
+        this.logTransaction(userId, 'work', salary);
+        this.saveData();
+        
+        return { success: true, user };
+    }
+
+    // VIP কিনা
+    buyVip(userId, vipLevel) {
+        const user = this.getUser(userId);
+        const plan = this.vipPlans[vipLevel];
+        
+        if (!plan) {
+            return { success: false, message: 'Invalid VIP level' };
+        }
+        
+        if (user.cash < plan.price) {
+            return { success: false, message: 'Insufficient cash' };
+        }
+        
+        user.cash -= plan.price;
+        user.isVip = true;
+        user.vipLevel = vipLevel;
+        
+        // 30 দিনের জন্য VIP
+        const expireDate = new Date();
+        expireDate.setDate(expireDate.getDate() + 30);
+        user.vipExpires = expireDate.getTime();
+        
+        user.totalSpent += plan.price;
+        
+        this.logTransaction(userId, 'vip_purchase', plan.price, { vipLevel });
+        this.saveData();
+        
+        return { success: true, user, plan };
+    }
+
+    // VIP ডেইলি বোনাস
+    claimVipDaily(userId) {
+        const user = this.getUser(userId);
+        
+        if (!user.isVip || user.vipLevel === 0) {
+            return { success: false, message: 'You are not VIP' };
+        }
+        
+        // VIP এক্সপায়ার চেক
+        if (user.vipExpires && Date.now() > user.vipExpires) {
+            user.isVip = false;
+            user.vipLevel = 0;
+            this.saveData();
+            return { success: false, message: 'VIP expired' };
+        }
+        
+        const today = new Date().toDateString();
+        if (user.vipDailyClaimed === today) {
+            return { success: false, message: 'Already claimed today' };
+        }
+        
+        const bonus = this.vipPlans[user.vipLevel].dailyBonus;
+        user.cash += bonus;
+        user.totalEarned += bonus;
+        user.vipDailyClaimed = today;
+        
+        this.logTransaction(userId, 'vip_daily', bonus);
+        this.saveData();
+        
+        return { success: true, user, bonus };
+    }
+
+    // লিডারবোর্ড
+    getLeaderboard(type = 'total', limit = 10) {
+        const users = Object.values(this.data.users);
+        
+        let sortedUsers = [];
+        
+        switch(type) {
+            case 'total':
+                sortedUsers = users.sort((a, b) => (b.cash + b.bank) - (a.cash + a.bank));
+                break;
+            case 'cash':
+                sortedUsers = users.sort((a, b) => b.cash - a.cash);
+                break;
+            case 'bank':
+                sortedUsers = users.sort((a, b) => b.bank - a.bank);
+                break;
+            case 'vip':
+                sortedUsers = users.filter(u => u.isVip).sort((a, b) => b.vipLevel - a.vipLevel);
+                break;
+            case 'gambling':
+                sortedUsers = users.sort((a, b) => b.gambleWins - a.gambleWins);
+                break;
+        }
+        
+        return sortedUsers.slice(0, limit);
+    }
+
+    // ট্রানজেকশন লগ
+    logTransaction(userId, type, amount, details = {}) {
+        const transaction = {
+            userId,
+            type,
+            amount,
+            details,
+            timestamp: Date.now(),
+            date: new Date().toISOString()
+        };
+        
+        this.data.transactions.push(transaction);
+        
+        // সর্বোচ্চ 1000 ট্রানজেকশন রাখা
+        if (this.data.transactions.length > 1000) {
+            this.data.transactions = this.data.transactions.slice(-1000);
         }
     }
 }
 
-module.exports = EconomySystem;
+// Global economy instance
+const economy = new EconomySystem();
+
+module.exports = economy;
