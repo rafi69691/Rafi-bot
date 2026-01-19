@@ -1,7 +1,8 @@
+// scripts/cmds/vip.js
 module.exports = {
   config: {
     name: "vip",
-    aliases: ["ভিআইপি"],
+    aliases: ["ভিআইপি", "প্রিমিয়াম"],
     version: "2.0",
     author: "RAFI",
     countDown: 5,
@@ -14,7 +15,7 @@ module.exports = {
     },
     category: "economy",
     guide: {
-      en: "{pn} buy\n{pn} status\n{pn} daily\n{pn} plans\n{pn} leaderboard"
+      en: "{pn} buy [level]\n{pn} status\n{pn} daily\n{pn} plans\n{pn} leaderboard\n{pn} casino [amount]\n{pn} double"
     }
   },
 
@@ -22,167 +23,214 @@ module.exports = {
     const action = args[0]?.toLowerCase() || 'plans';
     const userName = await usersData.getName(event.senderID);
     
+    const vipPlans = {
+      1: { 
+        name: "Bronze VIP", 
+        price: 5000000, 
+        duration: 7, 
+        color: "🟤",
+        dailyBonus: 50000,
+        gambleBonus: 5,
+        transferBonus: 2
+      },
+      2: { 
+        name: "Silver VIP", 
+        price: 15000000, 
+        duration: 15, 
+        color: "⚪",
+        dailyBonus: 150000,
+        gambleBonus: 10,
+        transferBonus: 5
+      },
+      3: { 
+        name: "Gold VIP", 
+        price: 30000000, 
+        duration: 30, 
+        color: "🟡",
+        dailyBonus: 300000,
+        gambleBonus: 15,
+        transferBonus: 8
+      },
+      4: { 
+        name: "Diamond VIP", 
+        price: 50000000, 
+        duration: 30, 
+        color: "🔷",
+        dailyBonus: 500000,
+        gambleBonus: 20,
+        transferBonus: 12
+      },
+      5: { 
+        name: "Royal VIP", 
+        price: 100000000, 
+        duration: 30, 
+        color: "👑",
+        dailyBonus: 1000000,
+        gambleBonus: 25,
+        transferBonus: 15
+      }
+    };
+    
     switch (action) {
       case 'buy':
       case 'purchase':
         const level = parseInt(args[1]);
         
         if (!level || level < 1 || level > 5) {
-          return message.reply(`💎 **VIP PURCHASE** 💎\n\n` +
-                              `Select VIP level (1-5):\n\n` +
-                              `1. 🟤 Bronze VIP - 5,000,000 টাকা (7 days)\n` +
-                              `2. ⚪ Silver VIP - 15,000,000 টাকা (15 days)\n` +
-                              `3. 🟡 Gold VIP - 30,000,000 টাকা (30 days)\n` +
-                              `4. 🔷 Diamond VIP - 50,000,000 টাকা (30 days)\n` +
-                              `5. 👑 Royal VIP - 100,000,000 টাকা (30 days)\n\n` +
-                              `📝 Usage: !vip buy [level]\n` +
-                              `Example: !vip buy 3`);
+          let plansList = `💎 **VIP PURCHASE** 💎\n\n`;
+          plansList += `Select VIP level (1-5):\n\n`;
+          
+          for (let i = 1; i <= 5; i++) {
+            const plan = vipPlans[i];
+            plansList += `${i}. ${plan.color} ${plan.name}\n`;
+            plansList += `   💰 Price: ${plan.price.toLocaleString()} টাকা\n`;
+            plansList += `   📅 Duration: ${plan.duration} days\n`;
+            plansList += `   🎁 Daily: ${plan.dailyBonus.toLocaleString()} টাকা\n\n`;
+          }
+          
+          plansList += `📝 Usage: !vip buy [level]\n`;
+          plansList += `Example: !vip buy 3`;
+          
+          return message.reply(plansList);
         }
         
-        // এখানে ইকোনমি সিস্টেম থেকে purchaseVip কল করুন
-        // const result = await economy.purchaseVip(event.senderID, level);
-        
-        const vipPlans = {
-          1: { name: "Bronze VIP", price: 5000000, duration: 7, color: "🟤" },
-          2: { name: "Silver VIP", price: 15000000, duration: 15, color: "⚪" },
-          3: { name: "Gold VIP", price: 30000000, duration: 30, color: "🟡" },
-          4: { name: "Diamond VIP", price: 50000000, duration: 30, color: "🔷" },
-          5: { name: "Royal VIP", price: 100000000, duration: 30, color: "👑" }
-        };
-        
         const plan = vipPlans[level];
-        const response = `🎉 **Congratulations ${userName}!** 🎉\n\n` +
-                        `✅ Successfully purchased **${plan.name}**!\n` +
-                        `💰 Price: ${plan.price.toLocaleString()} টাকা\n` +
-                        `📅 Duration: ${plan.duration} days\n\n` +
-                        `✨ **VIP Benefits Activated:**\n` +
-                        `• Daily Cash Bonus\n` +
-                        `• Higher Gambling Win Chance\n` +
-                        `• Transfer Bonuses\n` +
-                        `• Special VIP Commands\n\n` +
-                        `💎 Use !vip daily to claim your bonus`;
         
-        await message.reply(response);
+        // এখানে আপনার ইকোনমি সিস্টেম থেকে purchaseVip কল করুন
+        // প্রথমে চেক করুন ইউজারের যথেষ্ট টাকা আছে কিনা
+        // তারপর VIP অ্যাক্টিভেট করুন
+        
+        const purchaseMsg = `🎉 **Congratulations ${userName}!** 🎉\n\n` +
+                          `✅ Successfully purchased **${plan.name}**!\n` +
+                          `💰 Price: ${plan.price.toLocaleString()} টাকা\n` +
+                          `📅 Duration: ${plan.duration} days\n\n` +
+                          `✨ **VIP Benefits Activated:**\n` +
+                          `• Daily Bonus: ${plan.dailyBonus.toLocaleString()} টাকা\n` +
+                          `• Gambling Bonus: +${plan.gambleBonus}% win chance\n` +
+                          `• Transfer Bonus: +${plan.transferBonus}% extra cash\n` +
+                          `• Special VIP Commands\n\n` +
+                          `💎 Use !vip daily to claim your bonus\n` +
+                          `📊 Check !vip status`;
+        
+        await message.reply(purchaseMsg);
         break;
         
       case 'status':
       case 'info':
-        // এখানে ইকোনমি সিস্টেম থেকে checkVipStatus কল করুন
-        // const status = await economy.checkVipStatus(event.senderID);
+        // এখানে ইকোনমি সিস্টেম থেকে VIP স্ট্যাটাস চেক করুন
+        // const vipData = await economy.getVipStatus(event.senderID);
         
-        const vipStatus = Math.random() > 0.5;
+        // Temporary VIP status (ডেমো উদ্দেশ্যে)
+        const hasVip = Math.random() > 0.5;
         
-        if (vipStatus) {
-          const vipLevels = ["Bronze", "Silver", "Gold", "Diamond", "Royal"];
-          const level = Math.floor(Math.random() * 5) + 1;
+        if (hasVip) {
+          const randomLevel = Math.floor(Math.random() * 5) + 1;
+          const plan = vipPlans[randomLevel];
           const daysLeft = Math.floor(Math.random() * 30) + 1;
           
-          await message.reply(`🌟 **VIP STATUS** 🌟\n\n` +
-                            `👤 User: ${userName}\n` +
-                            `✨ Level: ${vipLevels[level-1]} VIP\n` +
-                            `💰 Daily Bonus: ${(level * 50000).toLocaleString()} টাকা\n` +
-                            `🎰 Gambling Bonus: +${(level * 5)}% win chance\n` +
-                            `📅 Expires in: ${daysLeft} days\n\n` +
-                            `💎 Total Benefits: ${(level * 1000000).toLocaleString()} টাকা`);
+          const statusMsg = `🌟 **VIP STATUS** 🌟\n\n` +
+                           `👤 User: ${userName}\n` +
+                           `✨ Level: ${plan.color} ${plan.name}\n` +
+                           `💰 Daily Bonus: ${plan.dailyBonus.toLocaleString()} টাকা\n` +
+                           `🎰 Gambling Bonus: +${plan.gambleBonus}% win chance\n` +
+                           `💸 Transfer Bonus: +${plan.transferBonus}% extra cash\n` +
+                           `📅 Expires in: ${daysLeft} days\n\n` +
+                           `🎮 Available Commands:\n` +
+                           `• !vip daily - Claim daily bonus\n` +
+                           `• !vip casino - VIP Casino\n` +
+                           `• !vip double - Double daily (Gold+)\n` +
+                           `• !vipshop - VIP Shop`;
+          
+          await message.reply(statusMsg);
         } else {
           await message.reply(`❌ **You are not a VIP member!**\n\n` +
                             `✨ Purchase VIP to unlock amazing benefits!\n` +
-                            `💎 Use !vip plans to see available VIP packages`);
+                            `💎 Use !vip plans to see available packages\n` +
+                            `💰 Starting from 5,000,000 টাকা`);
         }
         break;
         
       case 'daily':
       case 'bonus':
         // এখানে ইকোনমি সিস্টেম থেকে claimVipDaily কল করুন
-        // const daily = await economy.claimVipDaily(event.senderID);
+        // প্রথমে চেক করুন ইউজার VIP কিনা
+        // তারপর ডেইলি বোনাস দিন
         
-        const bonusAmount = Math.floor(Math.random() * 500000) + 50000;
-        await message.reply(`🎁 **VIP DAILY BONUS** 🎁\n\n` +
-                          `💰 Received: ${bonusAmount.toLocaleString()} টাকা\n` +
-                          `✨ Keep your VIP active to claim daily!\n\n` +
-                          `⏰ Next bonus available in 24 hours\n` +
-                          `💎 Use !vip status to check your VIP`);
+        const bonusAmount = 50000 + Math.floor(Math.random() * 950000);
+        const dailyMsg = `🎁 **VIP DAILY BONUS** 🎁\n\n` +
+                        `👤 User: ${userName}\n` +
+                        `💰 Received: ${bonusAmount.toLocaleString()} টাকা\n` +
+                        `✨ Keep your VIP active to claim daily!\n\n` +
+                        `⏰ Next bonus available in 24 hours\n` +
+                        `💎 Check !vip status for more info`;
+        
+        await message.reply(dailyMsg);
         break;
         
       case 'plans':
       case 'packages':
-        await message.reply(`💎 **VIP MEMBERSHIP PLANS** 💎\n\n` +
-                          `🌟 **Exclusive Benefits for VIP Members:**\n` +
-                          `✅ Daily Cash Bonus (50K - 1M টাকা)\n` +
-                          `✅ Higher Gambling Win Chance (+5% to +25%)\n` +
-                          `✅ Transfer Bonuses (+2% to +15% extra)\n` +
-                          `✅ Special VIP Commands\n` +
-                          `✅ VIP Casino Access\n` +
-                          `✅ Double Daily Bonus (Gold+)\n\n` +
-                          
-                          `📊 **Available Plans:**\n\n` +
-                          `1. 🟤 **Bronze VIP**\n` +
-                          `   • Price: 5,000,000 টাকা\n` +
-                          `   • Duration: 7 days\n` +
-                          `   • Daily: 50,000 টাকা\n` +
-                          `   • Gamble: +5% win chance\n\n` +
-                          
-                          `2. ⚪ **Silver VIP**\n` +
-                          `   • Price: 15,000,000 টাকা\n` +
-                          `   • Duration: 15 days\n` +
-                          `   • Daily: 150,000 টাকা\n` +
-                          `   • Gamble: +10% win chance\n` +
-                          `   • VIP Casino Access\n\n` +
-                          
-                          `3. 🟡 **Gold VIP**\n` +
-                          `   • Price: 30,000,000 টাকা\n` +
-                          `   • Duration: 30 days\n` +
-                          `   • Daily: 300,000 টাকা\n` +
-                          `   • Gamble: +15% win chance\n` +
-                          `   • Double Daily Bonus\n\n` +
-                          
-                          `4. 🔷 **Diamond VIP**\n` +
-                          `   • Price: 50,000,000 টাকা\n` +
-                          `   • Duration: 30 days\n` +
-                          `   • Daily: 500,000 টাকা\n` +
-                          `   • Gamble: +20% win chance\n\n` +
-                          
-                          `5. 👑 **Royal VIP**\n` +
-                          `   • Price: 100,000,000 টাকা\n` +
-                          `   • Duration: 30 days\n` +
-                          `   • Daily: 1,000,000 টাকা\n` +
-                          `   • Gamble: +25% win chance\n\n` +
-                          
-                          `📝 **Purchase:** !vip buy [level]\n` +
-                          `📊 **Check Status:** !vip status\n` +
-                          `🎁 **Claim Daily:** !vip daily`);
+        let plansMsg = `💎 **VIP MEMBERSHIP PLANS** 💎\n\n`;
+        plansMsg += `🌟 **Exclusive Benefits for VIP Members:**\n`;
+        plansMsg += `✅ Daily Cash Bonus (50K - 1M টাকা)\n`;
+        plansMsg += `✅ Higher Gambling Win Chance (+5% to +25%)\n`;
+        plansMsg += `✅ Transfer Bonuses (+2% to +15% extra)\n`;
+        plansMsg += `✅ Special VIP Commands\n`;
+        plansMsg += `✅ VIP Casino Access\n`;
+        plansMsg += `✅ Double Daily Bonus (Gold+)\n`;
+        plansMsg += `✅ Exclusive VIP Shop\n\n`;
+        
+        plansMsg += `📊 **Available Plans:**\n\n`;
+        
+        for (let i = 1; i <= 5; i++) {
+          const plan = vipPlans[i];
+          plansMsg += `${i}. ${plan.color} **${plan.name}**\n`;
+          plansMsg += `   • Price: ${plan.price.toLocaleString()} টাকা\n`;
+          plansMsg += `   • Duration: ${plan.duration} days\n`;
+          plansMsg += `   • Daily Bonus: ${plan.dailyBonus.toLocaleString()} টাকা\n`;
+          plansMsg += `   • Gambling: +${plan.gambleBonus}% win chance\n`;
+          plansMsg += `   • Transfer: +${plan.transferBonus}% extra\n\n`;
+        }
+        
+        plansMsg += `📝 **Purchase:** !vip buy [level]\n`;
+        plansMsg += `📊 **Check Status:** !vip status\n`;
+        plansMsg += `🎁 **Claim Daily:** !vip daily\n`;
+        plansMsg += `🎰 **VIP Casino:** !vip casino [amount]\n`;
+        plansMsg += `🛍️ **VIP Shop:** !vipshop`;
+        
+        await message.reply(plansMsg);
         break;
         
       case 'leaderboard':
       case 'top':
-        // এখানে ইকোনমি সিস্টেম থেকে getVipLeaderboard কল করুন
-        // const vipTop = await economy.getVipLeaderboard(10);
+        // এখানে ইকোনমি সিস্টেম থেকে VIP লিডারবোর্ড ডাটা আনুন
         
         const vipLeaders = [
-          { username: "RAFI", level: 5, color: "👑", benefits: 5000000 },
-          { username: "VIP_User1", level: 4, color: "🔷", benefits: 3000000 },
-          { username: "VIP_User2", level: 3, color: "🟡", benefits: 2000000 },
-          { username: "VIP_User3", level: 3, color: "🟡", benefits: 1500000 },
-          { username: "VIP_User4", level: 2, color: "⚪", benefits: 1000000 },
-          { username: "VIP_User5", level: 2, color: "⚪", benefits: 800000 },
-          { username: "VIP_User6", level: 1, color: "🟤", benefits: 500000 },
-          { username: "VIP_User7", level: 1, color: "🟤", benefits: 400000 },
-          { username: "VIP_User8", level: 1, color: "🟤", benefits: 300000 },
-          { username: "VIP_User9", level: 1, color: "🟤", benefits: 200000 }
+          { name: "RAFI", level: 5, color: "👑", benefits: 5000000 },
+          { name: "VIP_User1", level: 4, color: "🔷", benefits: 3000000 },
+          { name: "VIP_User2", level: 3, color: "🟡", benefits: 2000000 },
+          { name: "VIP_User3", level: 3, color: "🟡", benefits: 1500000 },
+          { name: "VIP_User4", level: 2, color: "⚪", benefits: 1000000 },
+          { name: "VIP_User5", level: 2, color: "⚪", benefits: 800000 },
+          { name: "VIP_User6", level: 1, color: "🟤", benefits: 500000 },
+          { name: "VIP_User7", level: 1, color: "🟤", benefits: 400000 },
+          { name: "VIP_User8", level: 1, color: "🟤", benefits: 300000 },
+          { name: "VIP_User9", level: 1, color: "🟤", benefits: 200000 }
         ];
         
-        let response = `🏆 **TOP VIP MEMBERS** 🏆\n\n`;
+        let leaderboardMsg = `🏆 **TOP VIP MEMBERS** 🏆\n\n`;
         
         vipLeaders.forEach((user, index) => {
           const medal = index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : "🔸";
           const levels = ["", "Bronze", "Silver", "Gold", "Diamond", "Royal"];
-          response += `${medal} ${index + 1}. ${user.username}\n`;
-          response += `   ${user.color} ${levels[user.level]} VIP\n`;
-          response += `   💰 Benefits: ${user.benefits.toLocaleString()} টাকা\n`;
+          leaderboardMsg += `${medal} ${index + 1}. ${user.name}\n`;
+          leaderboardMsg += `   ${user.color} ${levels[user.level]} VIP\n`;
+          leaderboardMsg += `   💰 Total Benefits: ${user.benefits.toLocaleString()} টাকা\n`;
         });
         
-        response += `\n💎 Become a VIP: !vip plans`;
-        await message.reply(response);
+        leaderboardMsg += `\n💎 Become a VIP: !vip buy [level]\n`;
+        leaderboardMsg += `📊 Check VIP plans: !vip plans`;
+        
+        await message.reply(leaderboardMsg);
         break;
         
       case 'casino':
@@ -198,20 +246,24 @@ module.exports = {
                               `💎 Check: !vip status`);
         }
         
-        await message.reply(`🎰 **VIP CASINO** 🎰\n\n` +
-                          `💰 Bet: ${amount.toLocaleString()} টাকা\n` +
-                          `🎯 Playing VIP Casino...\n\n` +
-                          `✨ Exclusive for VIP members only!`);
+        // VIP ক্যাসিনো লজিক ইমপ্লিমেন্ট করুন
+        const win = Math.random() > 0.5;
+        const casinoMsg = win ? 
+          `🎰 **VIP CASINO - JACKPOT!** 🎰\n\n💰 Bet: ${amount.toLocaleString()} টাকা\n✨ Won: ${(amount * 3).toLocaleString()} টাকা\n🎯 Exclusive VIP game!` :
+          `🎰 **VIP CASINO** 🎰\n\n💰 Bet: ${amount.toLocaleString()} টাকা\n💸 Lost: ${amount.toLocaleString()} টাকা\n🎯 Better luck next time!`;
+        
+        await message.reply(casinoMsg);
         break;
         
       case 'double':
+        // ডাবল ডেইলি বোনাস (শুধুমাত্র Gold+ VIP)
         await message.reply(`🎁 **VIP DOUBLE DAILY** 🎁\n\n` +
                           `✨ Get double your daily bonus!\n` +
                           `💰 Regular bonus × 2\n\n` +
                           `🔒 Requires: Gold VIP or higher\n` +
                           `⏰ Available once daily\n\n` +
-                          `💎 Use: !vip double\n` +
-                          `📊 Check: !vip status`);
+                          `💎 Check your VIP level: !vip status\n` +
+                          `📊 VIP plans: !vip plans`);
         break;
         
       default:
@@ -225,11 +277,12 @@ module.exports = {
                           `• !vip leaderboard - Top VIP members\n` +
                           `• !vip casino [amount] - VIP Casino\n` +
                           `• !vip double - Double daily (Gold+)\n\n` +
+                          `🛍️ **VIP Shop:** !vipshop\n\n` +
                           `🌟 **VIP Benefits:**\n` +
                           `✅ Daily Cash Bonus\n` +
-                          `✅ Higher Win Chance\n` +
+                          `✅ Higher Win Chance in Gambling\n` +
                           `✅ Transfer Bonuses\n` +
-                          `✅ Special Commands\n` +
+                          `✅ Special VIP Commands\n` +
                           `✅ VIP Casino Access`);
     }
   }
