@@ -1,92 +1,103 @@
-const moment = require("moment-timezone");
+// scripts/cmds/daily.js
+const economy = require('../economy');
 
 module.exports = {
-	config: {
-		name: "daily",
-		version: "1.2",
-		author: "NTKhang",
-		countDown: 5,
-		role: 0,
-		description: {
-			vi: "Nhận quà hàng ngày",
-			en: "Receive daily gift"
-		},
-		category: "game",
-		guide: {
-			vi: "   {pn}: Nhận quà hàng ngày"
-				+ "\n   {pn} info: Xem thông tin quà hàng ngày",
-			en: "   {pn}"
-				+ "\n   {pn} info: View daily gift information"
-		},
-		envConfig: {
-			rewardFirstDay: {
-				coin: 100,
-				exp: 10
-			}
-		}
-	},
+  config: {
+    name: "daily",
+    aliases: ["দৈনিক", "ডেইলি", "dailybonus", "টাস্ক"],
+    version: "2.0",
+    author: "RAFI",
+    countDown: 5,
+    role: 0,
+    shortDescription: {
+      en: "Complete daily tasks and earn money"
+    },
+    longDescription: {
+      en: "Complete daily tasks to earn cash with instant balance updates"
+    },
+    category: "economy",
+    guide: {
+      en: "{pn} or {pn} claim [task_id]"
+    }
+  },
 
-	langs: {
-		vi: {
-			monday: "Thứ 2",
-			tuesday: "Thứ 3",
-			wednesday: "Thứ 4",
-			thursday: "Thứ 5",
-			friday: "Thứ 6",
-			saturday: "Thứ 7",
-			sunday: "Chủ nhật",
-			alreadyReceived: "Bạn đã nhận quà rồi",
-			received: "Bạn đã nhận được %1 coin và %2 exp"
-		},
-		en: {
-			monday: "Monday",
-			tuesday: "Tuesday",
-			wednesday: "Wednesday",
-			thursday: "Thursday",
-			friday: "Friday",
-			saturday: "Saturday",
-			sunday: "Sunday",
-			alreadyReceived: "You have already received the gift",
-			received: "You have received %1 coin and %2 exp"
-		}
-	},
-
-	onStart: async function ({ args, message, event, envCommands, usersData, commandName, getLang }) {
-		const reward = envCommands[commandName].rewardFirstDay;
-		if (args[0] == "info") {
-			let msg = "";
-			for (let i = 1; i < 8; i++) {
-				const getCoin = Math.floor(reward.coin * (1 + 20 / 100) ** ((i == 0 ? 7 : i) - 1));
-				const getExp = Math.floor(reward.exp * (1 + 20 / 100) ** ((i == 0 ? 7 : i) - 1));
-				const day = i == 7 ? getLang("sunday") :
-					i == 6 ? getLang("saturday") :
-						i == 5 ? getLang("friday") :
-							i == 4 ? getLang("thursday") :
-								i == 3 ? getLang("wednesday") :
-									i == 2 ? getLang("tuesday") :
-										getLang("monday");
-				msg += `${day}: ${getCoin} coin, ${getExp} exp\n`;
-			}
-			return message.reply(msg);
-		}
-
-		const dateTime = moment.tz("Asia/Ho_Chi_Minh").format("DD/MM/YYYY");
-		const date = new Date();
-		const currentDay = date.getDay(); // 0: sunday, 1: monday, 2: tuesday, 3: wednesday, 4: thursday, 5: friday, 6: saturday
-		const { senderID } = event;
-
-		const userData = await usersData.get(senderID);
-		if (userData.data.lastTimeGetReward === dateTime)
-			return message.reply(getLang("alreadyReceived"));
-
-		const getCoin = Math.floor(reward.coin * (1 + 20 / 100) ** ((currentDay == 0 ? 7 : currentDay) - 1));
-		const getExp = Math.floor(reward.exp * (1 + 20 / 100) ** ((currentDay == 0 ? 7 : currentDay) - 1));
-		userData.data.lastTimeGetReward = dateTime;
-		await usersData.set(senderID, {
-			money: userData.money + getCoin,
-			exp: userData.exp + getExp,
-			data: userData.data
-		});
-		message.reply(getLang("received", getCoin, getExp));
-	}
+  onStart: async function ({ message, event, args, usersData }) {
+    const { senderID } = event;
+    const userName = await usersData.getName(senderID);
+    const action = args[0]?.toLowerCase() || 'list';
+    
+    const dailyTasks = {
+      1: { name: "Daily Login", reward: 10000, description: "Just check in daily" },
+      2: { name: "Balance Check", reward: 5000, description: "Check your balance 3 times" },
+      3: { name: "Play Gamble", reward: 20000, description: "Play any gambling game once" },
+      4: { name: "Win a Game", reward: 50000, description: "Win any gambling game" },
+      5: { name: "Transfer Money", reward: 15000, description: "Transfer money to someone" },
+      6: { name: "Work Once", reward: 25000, description: "Work at any job" },
+      7: { name: "Be VIP", reward: 100000, description: "Be a VIP member" },
+      8: { name: "Play 3 Games", reward: 30000, description: "Play 3 different games" }
+    };
+    
+    if (action === 'list' || action === 'tasks') {
+      let tasksList = `📅 **DAILY TASKS** 📅\n\n`;
+      tasksList += `👤 Welcome, ${userName}!\n`;
+      tasksList += `💰 Complete tasks to earn money!\n\n`;
+      
+      Object.entries(dailyTasks).forEach(([id, task]) => {
+        tasksList += `🔸 **Task ${id}:** ${task.name}\n`;
+        tasksList += `📝 ${task.description}\n`;
+        tasksList += `💰 Reward: ${task.reward.toLocaleString()} টাকা\n`;
+        tasksList += `🎯 Claim: !daily claim ${id}\n\n`;
+      });
+      
+      tasksList += `📝 **Total Available:** 265,000 টাকা\n`;
+      tasksList += `🔄 **Resets every 24 hours**\n\n`;
+      tasksList += `💡 **Note:** Balance updates instantly after claiming!`;
+      
+      await message.reply(tasksList);
+      
+    } else if (action === 'claim') {
+      const taskId = parseInt(args[1]);
+      const task = dailyTasks[taskId];
+      
+      if (!task) {
+        return message.reply(`❌ Invalid task ID! Use !daily to see all tasks`);
+      }
+      
+      // ✅ রিয়েল-টাইম টাস্ক কমপ্লিশন
+      const result = economy.completeDailyTask(senderID, taskId, task.reward);
+      
+      if (!result.success) {
+        return message.reply(`❌ ${result.message}`);
+      }
+      
+      const userData = result.user;
+      
+      const claimMsg = `✅ **TASK COMPLETED!** ✅\n\n` +
+                      `🔸 Task ${taskId}: ${task.name}\n` +
+                      `📝 ${task.description}\n\n` +
+                      `💰 **Reward Received:** ${task.reward.toLocaleString()} টাকা\n\n` +
+                      
+                      `💰 **New Balance:**\n` +
+                      `💵 Cash: ${userData.cash.toLocaleString()} টাকা\n` +
+                      `🏦 Bank: ${userData.bank.toLocaleString()} টাকা\n` +
+                      `📊 Total: ${userData.total.toLocaleString()} টাকা\n\n` +
+                      
+                      `📈 **Total Earned:** ${userData.totalEarned.toLocaleString()} টাকা\n` +
+                      `🔄 Next task: !daily`;
+      
+      await message.reply(claimMsg);
+      
+    } else {
+      await message.reply(`📅 **DAILY TASKS SYSTEM** 📅\n\n` +
+                         `💰 Earn money daily with tasks!\n\n` +
+                         `📚 **Commands:**\n` +
+                         `• !daily - View all tasks\n` +
+                         `• !daily claim [1-8] - Claim reward\n\n` +
+                         `💡 **Features:**\n` +
+                         `✅ Instant balance updates\n` +
+                         `✅ Real-time money earning\n` +
+                         `✅ Daily reset system\n` +
+                         `✅ VIP bonus tasks available`);
+    }
+  }
 };
