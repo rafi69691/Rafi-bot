@@ -1,0 +1,60 @@
+module.exports = {
+  config: {
+    name: "stats",
+    aliases: ["mystats", "স্ট্যাটস"],
+    version: "1.0",
+    author: "RAFI",
+    countDown: 5,
+    role: 0,
+    shortDescription: {
+      en: "View your economy statistics"
+    },
+    longDescription: {
+      en: "Check your gambling stats, earnings, and more"
+    },
+    category: "economy",
+    guide: {
+      en: "{pn}"
+    }
+  },
+
+  onStart: async function ({ message, event, usersData }) {
+    const userName = await usersData.getName(event.senderID);
+    
+    // এখানে ইকোনমি সিস্টেম থেকে স্ট্যাটস লোড করুন
+    // const stats = await economy.getStats(event.senderID);
+    
+    // Temporary stats
+    const stats = {
+      cash: 1500000,
+      bank: 500000,
+      total: 2000000,
+      totalEarned: 3000000,
+      totalSpent: 1000000,
+      netProfit: 2000000,
+      gambleWins: 15,
+      gambleLosses: 10,
+      totalGames: 25,
+      winRate: 60
+    };
+    
+    const response = `📊 **${userName}'s Statistics** 📊\n\n` +
+                    `💰 **ফাইনান্সিয়াল:**\n` +
+                    `💵 ক্যাশ: ${stats.cash.toLocaleString()} টাকা\n` +
+                    `🏦 ব্যাংক: ${stats.bank.toLocaleString()} টাকা\n` +
+                    `📊 মোট: ${stats.total.toLocaleString()} টাকা\n` +
+                    `📈 মোট আয়: ${stats.totalEarned.toLocaleString()} টাকা\n` +
+                    `📉 মোট খরচ: ${stats.totalSpent.toLocaleString()} টাকা\n` +
+                    `💹 নেট প্রফিট: ${stats.netProfit.toLocaleString()} টাকা\n\n` +
+                    
+                    `🎰 **গ্যাম্বলিং স্ট্যাটস:**\n` +
+                    `✅ জয়: ${stats.gambleWins} বার\n` +
+                    `❌ হার: ${stats.gambleLosses} বার\n` +
+                    `🎮 মোট গেম: ${stats.totalGames} বার\n` +
+                    `📊 জয়ের রেট: ${stats.winRate}%\n\n` +
+                    
+                    `⭐ **র‍্যাঙ্ক:** #1 (শীর্ষ 1%)`;
+    
+    await message.reply(response);
+  }
+};
