@@ -5,15 +5,15 @@ module.exports = {
   config: {
     name: "balance",
     aliases: ["bal", "তহবিল", "ব্যালেন্স", "টাকা"],
-    version: "3.0",
+    version: "1.0",
     author: "RAFI",
     countDown: 5,
     role: 0,
     shortDescription: {
-      en: "Check your real-time economy balance"
+      en: "Check your economy balance"
     },
     longDescription: {
-      en: "Check your current cash, bank balance and VIP status with real updates"
+      en: "Check your cash, bank balance and VIP status"
     },
     category: "economy",
     guide: {
@@ -32,8 +32,8 @@ module.exports = {
       
       const userName = await usersData.getName(targetID);
       
-      // ✅ রিয়েল-টাইম ডাটা লোড
-      const userData = economy.getUser(targetID, userName);
+      // ✅ রিয়েল ডাটা লোড
+      const balanceData = economy.checkBalance(targetID);
       
       // VIP ইনফো
       const vipLevels = {
@@ -45,47 +45,28 @@ module.exports = {
         5: { name: "Royal VIP", color: "👑", icon: "👑" }
       };
       
-      const vipInfo = vipLevels[userData.vipLevel] || vipLevels[0];
+      const vipInfo = vipLevels[balanceData.vipLevel] || vipLevels[0];
       
-      // VIP এক্সপায়ার চেক
-      let vipExpiryInfo = "";
-      if (userData.isVip && userData.vipExpires) {
-        const daysLeft = Math.ceil((userData.vipExpires - Date.now()) / (1000 * 60 * 60 * 24));
-        if (daysLeft > 0) {
-          vipExpiryInfo = `⏰ Expires in: ${daysLeft} days`;
-        } else {
-          vipExpiryInfo = "⚠️ VIP Expired";
-        }
-      }
-      
-      const response = `💰 **${userName}'s Balance** 💰\n\n` +
-                      `💵 **Cash:** ${userData.cash.toLocaleString()} টাকা\n` +
-                      `🏦 **Bank:** ${userData.bank.toLocaleString()} টাকা\n` +
-                      `📊 **Total:** ${userData.total.toLocaleString()} টাকা\n\n` +
+      const response = `💰 **${balanceData.username}'s Balance** 💰\n\n` +
+                      `💵 **Cash:** ${balanceData.cash.toLocaleString()} টাকা\n` +
+                      `🏦 **Bank:** ${balanceData.bank.toLocaleString()} টাকা\n` +
+                      `📊 **Total:** ${balanceData.total.toLocaleString()} টাকা\n\n` +
                       
                       `${vipInfo.icon} **VIP Status:** ${vipInfo.name}\n` +
-                      (userData.isVip ? 
-                       `🎁 Daily Bonus: ${economy.vipPlans[userData.vipLevel]?.dailyBonus.toLocaleString() || 0} টাকা\n` +
-                       `${vipExpiryInfo}\n` : 
-                       `💎 No VIP - Use !vip plans\n`) +
-                      `\n📈 **Statistics:**\n` +
-                      `📥 Total Earned: ${userData.totalEarned.toLocaleString()} টাকা\n` +
-                      `📤 Total Spent: ${userData.totalSpent.toLocaleString()} টাকা\n` +
-                      `🎰 Gambling: ${userData.gambleWins}W/${userData.gambleLosses}L\n\n` +
-                      
-                      `💡 **Commands:**\n` +
-                      `💰 !deposit [amount] - ব্যাংকে জমা\n` +
-                      `💰 !withdraw [amount] - ব্যাংক থেকে তুলুন\n` +
-                      `💰 !transfer [amount] [@user] - পাঠান\n` +
-                      `🎰 !gamble - টাকা বাজি করুন\n` +
-                      `📅 !daily - ডেইলি টাস্ক\n` +
-                      `💼 !work - কাজ করে আয় করুন`;
+                      (balanceData.isVip ? 
+                       `✨ Daily Bonus Available\n` : 
+                       `💎 Use !vip plans to upgrade\n`) +
+                      `\n💡 **Commands:**\n` +
+                      `• !deposit [amount] - ব্যাংকে জমা\n` +
+                      `• !withdraw [amount] - ব্যাংক থেকে তুলুন\n` +
+                      `• !transfer [amount] [@user] - পাঠান\n` +
+                      `• !gamble - টাকা বাজি করুন`;
       
       await message.reply(response);
       
     } catch (error) {
-      console.error("Balance command error:", error);
-      await message.reply("❌ ব্যালেন্স চেক করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।");
+      console.error("Balance error:", error);
+      await message.reply("❌ Error checking balance. Please try again.");
     }
   }
 };
