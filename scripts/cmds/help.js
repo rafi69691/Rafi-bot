@@ -4,19 +4,19 @@ const { commands, aliases } = global.GoatBot;
 module.exports = {
   config: {
     name: "help",
-    version: "2.0",
+    version: "3.0",
     author: "RAFI | Developer",
     countDown: 5,
     role: 0,
     shortDescription: {
-      en: "View command usage and list all commands directly",
+      en: "View all commands with beautiful formatting",
     },
     longDescription: {
-      en: "View command usage and list all commands directly",
+      en: "View command usage and list all commands with beautiful organized layout",
     },
     category: "info",
     guide: {
-      en: "help cmdName",
+      en: "help [cmdName]",
     },
     priority: 1,
   },
@@ -30,166 +30,330 @@ module.exports = {
       const categories = {};
       let msg = "";
 
-      msg += `╭─────────⭓\n│ ⭐ RAFI BOT HELP MENU ⭐\n╰─────────⭓\n`; 
+      // সুন্দর HEADER
+      msg += `╔══════════════════════╗\n`;
+      msg += `║      🎮 RAFI BOT     ║\n`;
+      msg += `║    HELP COMMANDS     ║\n`;
+      msg += `╚══════════════════════╝\n\n`;
+      
+      msg += `📁 **Prefix:** ${prefix}\n`;
+      msg += `📊 **Total Commands:** ${commands.size}\n`;
+      msg += `👑 **Developer:** RAFI\n`;
+      msg += `🔗 **Facebook:** fb.com/share/1AT5HsAFqC/\n`;
+      msg += `─`.repeat(30) + `\n\n`;
 
-      // প্রথমে ECONOMY ক্যাটাগরি
-      const economyCommands = [
-        'balance',
-        'deposit', 
-        'withdraw',
-        'transfer',
-        'bank',
-        'gamble',
-        'gambletop',
-        'stats',
-        'leaderboard',
-        'vip',
-        'vipshop',
-        'reset'
-      ];
-
-      // VIP কমান্ডগুলোর জন্য আলাদা লিস্ট
-      const vipCommands = [
-        'vip',
-        'vipshop'
-      ];
-
-      // অন্যান্য কমান্ড ক্যাটাগরাইজ করুন
+      // ক্যাটাগরি সংগ্রহ করুন
       for (const [name, value] of commands) {
         if (value.config.role > 1 && role < value.config.role) continue;
 
-        const category = value.config.category || "Uncategorized";
+        const category = value.config.category?.toLowerCase() || "uncategorized";
         categories[category] = categories[category] || { commands: [] };
         categories[category].commands.push(name);
       }
 
-      // ECONOMY সেকশন শো করানো হচ্ছে না কারণ আমরা আলাদাভাবে শো করাব
-      delete categories["economy"];
-
-      // প্রথমে ECONOMY কমান্ড শো করুন
-      msg += `\n╭─────⭓ ECONOMY`;
-      for (let i = 0; i < economyCommands.length; i += 3) {
-        const cmds = economyCommands.slice(i, i + 3).map((item) => `💰 ${item}`);
-        msg += `\n│${cmds.join(" ".repeat(Math.max(1, 15 - cmds.join("").length)))}`;
-      }
-      msg += `\n╰────────────⭓\n`;
-
-      // তারপর অন্যান্য ক্যাটাগরি
-      Object.keys(categories).forEach((category) => {
-        if (category !== "info") {
-          msg += `\n╭─────⭓ ${category.toUpperCase()}`;
-
-          const names = categories[category].commands.sort();
-          for (let i = 0; i < names.length; i += 3) {
-            const cmds = names.slice(i, i + 3).map((item) => `✧${item}`);
-            msg += `\n│${cmds.join(" ".repeat(Math.max(1, 15 - cmds.join("").length)))}`;
-          }
-
-          msg += `\n╰────────────⭓\n`;
+      // 📊 **ECONOMY SYSTEM** (প্রথমে শো করা)
+      const economyCmds = categories["economy"]?.commands.sort() || [];
+      if (economyCmds.length > 0) {
+        msg += `📊 ━━━━━━【 ECONOMY 】━━━━━━ 📊\n\n`;
+        
+        // মেইন ইকোনমি কমান্ড
+        const mainEconomy = ['balance', 'deposit', 'withdraw', 'transfer', 'bank'];
+        msg += `💰 **Main Economy:**\n`;
+        msg += `├─ ${mainEconomy.map(cmd => `• ${cmd}`).join('\n├─ ')}\n\n`;
+        
+        // গ্যাম্বলিং কমান্ড
+        const gamblingCmds = economyCmds.filter(cmd => 
+          ['gamble', 'gambletop', 'slots', 'dice', 'coinflip', 'roulette'].includes(cmd)
+        );
+        if (gamblingCmds.length > 0) {
+          msg += `🎰 **Gambling Games:**\n`;
+          msg += `├─ ${gamblingCmds.map(cmd => `• ${cmd}`).join('\n├─ ')}\n\n`;
         }
-      });
+        
+        // VIP সিস্টেম
+        const vipCmds = economyCmds.filter(cmd => 
+          ['vip', 'vipshop', 'viptop'].includes(cmd)
+        );
+        if (vipCmds.length > 0) {
+          msg += `💎 **VIP System:**\n`;
+          msg += `├─ ${vipCmds.map(cmd => `• ${cmd}`).join('\n├─ ')}\n\n`;
+        }
+        
+        // অন্যান্য ইকোনমি
+        const otherEconomy = economyCmds.filter(cmd => 
+          ![...mainEconomy, ...gamblingCmds, ...vipCmds].includes(cmd)
+        );
+        if (otherEconomy.length > 0) {
+          msg += `📈 **Other Economy:**\n`;
+          msg += `├─ ${otherEconomy.map(cmd => `• ${cmd}`).join('\n├─ ')}\n\n`;
+        }
+        
+        delete categories["economy"];
+        msg += `─`.repeat(30) + `\n\n`;
+      }
 
-      const totalCommands = commands.size;
-      msg += `\n\n⭔ RAFI Bot has ${totalCommands} commands\n⭔ Type ${prefix}help <command name> to learn Usage\n`;
+      // অন্যান্য ক্যাটাগরি
+      const sortedCategories = Object.keys(categories).sort();
       
-      // 📌 ECONOMY COMMANDS DETAILS
-      msg += `\n📌 ECONOMY COMMANDS:\n`;
-      msg += `💰 balance - Check your balance\n`;
-      msg += `💰 deposit [amount] - Deposit to bank\n`;
-      msg += `💰 withdraw [amount] - Withdraw from bank\n`;
-      msg += `💰 transfer [amount] [@user] - Transfer money\n`;
-      msg += `💰 bank - View bank details\n`;
-      msg += `💰 leaderboard - Top 10 richest\n`;
+      for (const category of sortedCategories) {
+        if (category === "info") continue;
+        
+        const categoryName = category.toUpperCase();
+        const categoryEmoji = this.getCategoryEmoji(category);
+        const categoryCommands = categories[category].commands.sort();
+        
+        if (categoryCommands.length === 0) continue;
+        
+        msg += `${categoryEmoji} ━━━━━━【 ${categoryName} 】━━━━━━ ${categoryEmoji}\n\n`;
+        
+        // 3 কলামে কমান্ড শো করা
+        const chunkSize = Math.ceil(categoryCommands.length / 3);
+        const chunks = [];
+        
+        for (let i = 0; i < categoryCommands.length; i += chunkSize) {
+          chunks.push(categoryCommands.slice(i, i + chunkSize));
+        }
+        
+        // সারি বাই সারি শো করা
+        const maxRows = Math.max(...chunks.map(chunk => chunk.length));
+        
+        for (let row = 0; row < maxRows; row++) {
+          let rowText = "";
+          for (let col = 0; col < chunks.length; col++) {
+            if (chunks[col][row]) {
+              rowText += `• ${chunks[col][row].padEnd(15)}`;
+            } else {
+              rowText += " ".repeat(17);
+            }
+          }
+          msg += `${rowText.trim()}\n`;
+        }
+        
+        msg += `\n`;
+      }
+
+      // 📚 **QUICK GUIDE SECTION**
+      msg += `📚 ━━━━━━【 QUICK GUIDE 】━━━━━━ 📚\n\n`;
       
-      // 🎰 GAMBLING COMMANDS
-      msg += `\n🎰 GAMBLING COMMANDS:\n`;
-      msg += `🎲 gamble [amount] [game] - Play gambling games\n`;
-      msg += `📊 stats - View your statistics\n`;
-      msg += `🏆 gambletop - Top gamblers\n`;
-      msg += `🎮 Games: normal, coinflip, dice, slots\n`;
+      msg += `🎮 **HOW TO USE COMMANDS:**\n`;
+      msg += `├─ ${prefix}command [parameter]\n`;
+      msg += `├─ Example: ${prefix}gamble 1000\n`;
+      msg += `├─ Example: ${prefix}balance @user\n\n`;
       
-      // 💎 VIP SYSTEM
-      msg += `\n💎 VIP SYSTEM:\n`;
-      msg += `✨ vip plans - View VIP packages\n`;
-      msg += `✨ vip buy [level] - Purchase VIP\n`;
-      msg += `✨ vip status - Check VIP status\n`;
-      msg += `✨ vip daily - Claim daily bonus\n`;
-      msg += `✨ vip leaderboard - Top VIP members\n`;
-      msg += `✨ vipshop - VIP exclusive shop\n`;
-      msg += `✨ vip casino [amount] - VIP Casino\n`;
-      msg += `✨ vip double - Double daily (Gold+)\n`;
+      // 💰 **ECONOMY GUIDE**
+      msg += `💰 **ECONOMY GUIDE:**\n`;
+      msg += `├─ Start with ${prefix}balance\n`;
+      msg += `├─ Earn: ${prefix}daily, ${prefix}work, ${prefix}gamble\n`;
+      msg += `├─ Manage: ${prefix}deposit, ${prefix}withdraw\n`;
+      msg += `├─ VIP: ${prefix}vip plans\n\n`;
       
-      // VIP BENEFITS
-      msg += `\n🌟 VIP BENEFITS:\n`;
-      msg += `✅ Daily Cash Bonus (50K - 1M টাকা)\n`;
-      msg += `✅ Higher Gambling Win Chance (+5% to +25%)\n`;
-      msg += `✅ Transfer Bonuses (+2% to +15% extra)\n`;
-      msg += `✅ Special VIP Commands\n`;
-      msg += `✅ VIP Casino Access\n`;
-      msg += `✅ Double Daily Bonus (Gold+)\n`;
-      msg += `✅ Exclusive VIP Shop\n`;
+      // 🎰 **GAMBLING GAMES**
+      msg += `🎰 **GAMBLING GAMES:**\n`;
+      msg += `├─ ${prefix}gamble [amount] [game]\n`;
+      msg += `├─ Games: coinflip, dice, slots, roulette\n`;
+      msg += `├─ VIPs get +5% to +25% win chance\n\n`;
       
-      // ADMIN ECONOMY
-      msg += `\n👑 ADMIN ECONOMY:\n`;
-      msg += `⚡ admin add [@user] [amount]\n`;
-      msg += `⚡ admin remove [@user] [amount]\n`;
-      msg += `⚡ admin set [@user] [true/false]\n`;
+      // 💎 **VIP SYSTEM**
+      msg += `💎 **VIP SYSTEM (PAID):**\n`;
+      msg += `├─ Bronze: 10M | Silver: 30M\n`;
+      msg += `├─ Gold: 69M | Diamond: 109M\n`;
+      msg += `├─ Royal: 1B | Use: ${prefix}vip buy [1-5]\n\n`;
       
-      // RESET SYSTEM
-      msg += `\n🔄 RESET SYSTEM:\n`;
-      msg += `⚡ reset [all/user/transactions] - Economy reset (Admin only)\n`;
+      // ⚠️ **IMPORTANT NOTES**
+      msg += `⚠️ **IMPORTANT NOTES:**\n`;
+      msg += `├─ All money transactions are virtual\n`;
+      msg += `├─ VIP requires real balance\n`;
+      msg += `├─ Admin commands: ${prefix}reset, ${prefix}admin\n`;
+      msg += `├─ Support: fb.com/share/1AT5HsAFqC/\n`;
       
-      msg += `\n╭─✦ DEVELOPER: RAFI\n├‣ FACEBOOK\n╰‣: https://www.facebook.com/share/1AT5HsAFqC/`;
+      msg += `\n${"═".repeat(35)}`;
+      msg += `\n💡 **Tip:** Use ${prefix}help [command] for details\n`;
+      msg += `🌟 **Example:** ${prefix}help gamble\n`;
+      msg += `📞 **Developer:** RAFI\n`;
+      msg += `${"═".repeat(35)}`;
 
       try {
-        const hh = await message.reply({ body: msg });
+        const sentMessage = await message.reply({ body: msg });
 
-        // Automatically unsend the message after 80 seconds
+        // 90 সেকেন্ড পর মেসেজ ডিলিট
         setTimeout(() => {
-          message.unsend(hh.messageID);
-        }, 80000);
+          message.unsend(sentMessage.messageID);
+        }, 90000);
 
       } catch (error) {
         console.error("Error sending help message:", error);
+        // Fallback simple message
+        await message.reply(
+          `📚 **RAFI BOT HELP**\n\n` +
+          `Use: ${prefix}help [command]\n` +
+          `Example: ${prefix}help gamble\n\n` +
+          `💰 **Economy:** balance, deposit, withdraw, transfer\n` +
+          `🎰 **Gambling:** gamble, slots, dice, coinflip\n` +
+          `💎 **VIP:** vip, vipshop, viptop\n\n` +
+          `👑 Developer: RAFI`
+        );
       }
 
     } else {
+      // নির্দিষ্ট কমান্ডের হেল্প
       const commandName = args[0].toLowerCase();
       const command = commands.get(commandName) || commands.get(aliases.get(commandName));
 
       if (!command) {
-        await message.reply(`Command "${commandName}" not found in RAFI Bot.`);
+        await message.reply(
+          `❌ Command "${commandName}" not found!\n\n` +
+          `🔍 Available commands:\n` +
+          `💰 Economy: balance, deposit, withdraw, transfer\n` +
+          `🎰 Gambling: gamble, slots, dice, coinflip\n` +
+          `💎 VIP: vip, vipshop\n\n` +
+          `📋 Use: ${prefix}help (without command name)`
+        );
       } else {
         const configCommand = command.config;
-        const roleText = roleTextToString(configCommand.role);
+        const roleText = this.roleTextToString(configCommand.role);
         const author = configCommand.author || "RAFI";
+        
+        // ক্যাটাগরি ইমোজি
+        const categoryEmoji = this.getCategoryEmoji(configCommand.category);
+        
+        const longDescription = configCommand.longDescription 
+          ? configCommand.longDescription.en || configCommand.longDescription 
+          : configCommand.shortDescription?.en || configCommand.shortDescription || "No description available";
+        
+        const guideBody = configCommand.guide?.en || configCommand.guide || "No specific usage guide";
+        const usage = guideBody
+          .replace(/{p}/g, prefix)
+          .replace(/{n}/g, configCommand.name)
+          .replace(/{pn}/g, `${prefix}${configCommand.name}`);
 
-        const longDescription = configCommand.longDescription ? configCommand.longDescription.en || "No description" : "No description";
-
-        const guideBody = configCommand.guide?.en || "No guide available.";
-        const usage = guideBody.replace(/{he}/g, prefix).replace(/{lp}/g, configCommand.name);
-
-        const response = `╭─────────⭓\n│ 🎀 NAME: ${configCommand.name}\n│ 📃 Aliases: ${configCommand.aliases ? configCommand.aliases.join(", ") : "No aliases"}\n├──‣ INFO\n│ 📝 𝗗𝗲𝘀𝗰𝗿𝗶𝗽𝘁𝗶𝗼𝗻: ${longDescription}\n│ 👑 𝗔𝘂𝘁𝗵𝗼𝗿: RAFI\n│ 📚 𝗚𝘂𝗶𝗱𝗲: ${usage}\n├──‣ Usage\n│ ⭐ 𝗩𝗲𝗿𝘀𝗶𝗼𝗻: ${configCommand.version || "1.0"}\n│ ♻️ 𝗥𝗼𝗹𝗲: ${roleText}\n╰────────────⭓`;
+        // সুন্দর ফরম্যাটেড রেসপন্স
+        const response = 
+          `╔══════════════════════════════════╗\n` +
+          `║         📖 COMMAND HELP          ║\n` +
+          `╚══════════════════════════════════╝\n\n` +
+          
+          `🎀 **Name:** ${configCommand.name}\n` +
+          (configCommand.aliases && configCommand.aliases.length > 0 
+            ? `📌 **Aliases:** ${configCommand.aliases.join(", ")}\n` 
+            : ``) +
+          `📂 **Category:** ${categoryEmoji} ${configCommand.category || "General"}\n` +
+          `👑 **Author:** ${author}\n` +
+          `⭐ **Version:** ${configCommand.version || "1.0"}\n` +
+          `👥 **Role:** ${roleText}\n` +
+          `─`.repeat(40) + `\n\n` +
+          
+          `📝 **Description:**\n${this.wrapText(longDescription, 35)}\n\n` +
+          
+          `📚 **Usage:**\n\`\`\`${usage}\`\`\`\n\n` +
+          
+          `💡 **Examples:**\n${this.getCommandExamples(configCommand.name, prefix)}\n\n` +
+          
+          `🔗 **Related Commands:**\n${this.getRelatedCommands(configCommand.name, commands)}\n\n` +
+          
+          `${"═".repeat(40)}\n` +
+          `💡 Type ${prefix}help for all commands\n` +
+          `👑 Developed by RAFI`;
 
         const helpMessage = await message.reply(response);
 
+        // 80 সেকেন্ড পর ডিলিট
         setTimeout(() => {
           message.unsend(helpMessage.messageID);
         }, 80000);
       }
     }
   },
-};
 
-function roleTextToString(roleText) {
-  switch (roleText) {
-    case 0:
-      return "0 (All users)";
-    case 1:
-      return "1 (Group administrators)";
-    case 2:
-      return "2 (Admin bot)";
-    default:
-      return "Unknown role";
-  }
+  // হেল্পার ফাংশনসমূহ
+  getCategoryEmoji(category) {
+    const emojiMap = {
+      'economy': '💰',
+      'game': '🎮',
+      'gambling': '🎰',
+      'fun': '😄',
+      'tools': '🛠️',
+      'utility': '🔧',
+      'admin': '👑',
+      'owner': '🤴',
+      'nsfw': '🔞',
+      'image': '🖼️',
+      'info': 'ℹ️',
+      'music': '🎵',
+      'search': '🔍',
+      'vip': '💎'
+    };
+    return emojiMap[category?.toLowerCase()] || '📁';
+  },
+
+  roleTextToString(roleText) {
+    switch (roleText) {
+      case 0: return "👤 All Users";
+      case 1: return "👮 Group Admin";
+      case 2: return "👑 Bot Admin";
+      case 3: return "🤴 Owner Only";
+      default: return "Unknown Role";
     }
+  },
+
+  wrapText(text, maxLength) {
+    const words = text.split(' ');
+    const lines = [];
+    let currentLine = '';
+    
+    for (const word of words) {
+      if ((currentLine + word).length > maxLength) {
+        lines.push(currentLine.trim());
+        currentLine = word + ' ';
+      } else {
+        currentLine += word + ' ';
+      }
+    }
+    
+    if (currentLine.trim()) {
+      lines.push(currentLine.trim());
+    }
+    
+    return lines.map(line => `  ${line}`).join('\n');
+  },
+
+  getCommandExamples(commandName, prefix) {
+    const examples = {
+      'balance': `• ${prefix}balance\n• ${prefix}balance @user`,
+      'deposit': `• ${prefix}deposit 1000\n• ${prefix}deposit all`,
+      'withdraw': `• ${prefix}withdraw 500\n• ${prefix}withdraw 50%`,
+      'transfer': `• ${prefix}transfer 1000 @friend\n• ${prefix}transfer 5000 @user`,
+      'gamble': `• ${prefix}gamble 1000 coinflip\n• ${prefix}gamble 5000 slots\n• ${prefix}gamble 2000 dice`,
+      'vip': `• ${prefix}vip plans\n• ${prefix}vip buy 3\n• ${prefix}vip status\n• ${prefix}vip daily`,
+      'vipshop': `• ${prefix}vipshop list\n• ${prefix}vipshop buy lucky_charm`,
+      'daily': `• ${prefix}daily\n• ${prefix}daily claim 1`,
+      'work': `• ${prefix}work\n• ${prefix}work 3`,
+      'bank': `• ${prefix}bank\n• ${prefix}bank deposit 1000`,
+      'leaderboard': `• ${prefix}leaderboard\n• ${prefix}leaderboard vip`,
+      'stats': `• ${prefix}stats\n• ${prefix}stats @user`
+    };
+    
+    return examples[commandName] || `• ${prefix}${commandName} [parameters]`;
+  },
+
+  getRelatedCommands(commandName, commands) {
+    const relatedMap = {
+      'balance': 'deposit, withdraw, transfer, bank',
+      'deposit': 'balance, withdraw, bank, transfer',
+      'withdraw': 'balance, deposit, bank, transfer',
+      'transfer': 'balance, deposit, withdraw',
+      'gamble': 'balance, vip, gambletop, slots',
+      'vip': 'vipshop, balance, gamble, viptop',
+      'vipshop': 'vip, balance, vip daily',
+      'daily': 'work, balance, gamble',
+      'work': 'daily, balance, gamble',
+      'bank': 'balance, deposit, withdraw',
+      'leaderboard': 'balance, stats, viptop',
+      'stats': 'balance, leaderboard, gambletop'
+    };
+    
+    const related = relatedMap[commandName];
+    if (!related) return "No related commands";
+    
+    return related.split(', ').map(cmd => `• ${cmd}`).join('\n');
+  }
+};
