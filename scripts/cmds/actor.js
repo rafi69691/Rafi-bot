@@ -6,7 +6,7 @@ const baseApiUrl = async () => {
 };
 
 /**
-* @author MahMUD
+* @author RAFI
 * @author: do not delete it
 */
 
@@ -15,7 +15,7 @@ module.exports = {
     name: "actor",
     aliases: ["actorgame"],
     version: "1.7",
-    author: "MahMUD",
+    author: "RAFI",
     countDown: 10,
     role: 0,
     category: "game",
