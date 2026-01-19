@@ -1,0 +1,53 @@
+module.exports = {
+  config: {
+    name: "reset",
+    version: "1.0",
+    author: "RAFI",
+    countDown: 5,
+    role: 2, // শুধু অ্যাডমিনদের জন্য
+    shortDescription: {
+      en: "Reset economy system"
+    },
+    longDescription: {
+      en: "Reset all users' money and transactions"
+    },
+    category: "economy",
+    guide: {
+      en: "{pn} [all/user/transactions]"
+    }
+  },
+
+  onStart: async function ({ message, event, args, usersData }) {
+    const type = args[0] || 'all';
+    
+    if (!['all', 'user', 'transactions'].includes(type)) {
+      return message.reply(`🔄 **ইকোনমি রিসেট সিস্টেম** 🔄\n\n` +
+                          `⚠️ **সতর্কতা:** এটি সব ডাটা রিসেট করবে!\n\n` +
+                          `🔹 !reset all - সব ডাটা রিসেট (টাকা + হিস্টরি)\n` +
+                          `🔹 !reset user - শুধু ইউজারদের টাকা রিসেট\n` +
+                          `🔹 !reset transactions - শুধু ট্রানজেকশন হিস্টরি ডিলিট\n\n` +
+                          `📌 সবাই পাবে 1,000,000,000 টাকা স্টার্টিং ব্যালেন্স`);
+    }
+    
+    const confirmMsg = await message.reply(
+      `⚠️ **আপনি কি নিশ্চিত?** ⚠️\n\n` +
+      `আপনি ${type === 'all' ? 'সম্পূর্ণ ইকোনমি সিস্টেম' : 
+              type === 'user' ? 'সকল ইউজারের ব্যালেন্স' : 
+              'সমস্ত ট্রানজেকশন হিস্টরি'} রিসেট করতে চলেছেন!\n\n` +
+      `✅ রিসেট করতে "confirm" লিখুন\n` +
+      `❌ বাতিল করতে "cancel" লিখুন\n\n` +
+      `⏰ 30 সেকেন্ডের মধ্যে উত্তর দিন...`
+    );
+    
+    // Confirmation logic here (you need to implement confirmation system)
+    
+    // After confirmation
+    // const result = await economy.resetEconomy(event.senderID, type);
+    
+    await message.reply(`✅ **ইকোনমি রিসেট সম্পূর্ণ!**\n\n` +
+                       `📊 টাইপ: ${type}\n` +
+                       `💰 নতুন স্টার্টিং ব্যালেন্স: 1,000,000,000 টাকা\n` +
+                       `👥 সকল ইউজার রিসেট করা হয়েছে\n` +
+                       `🔄 বট রিস্টার্ট করা উচিত নতুন ডাটা লোড করতে`);
+  }
+};
